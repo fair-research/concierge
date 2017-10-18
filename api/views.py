@@ -1,15 +1,16 @@
 import os
-from flask import jsonify, request, send_file
+from flask import jsonify, request, render_template_string
 
 from app import app
 from api.utils import create_bag_archive, create_minid, upload_to_s3
 
 @app.route('/')
 def index():
-    msg_file = app.config.get('API_WELCOME_MESSAGE', '')
-    if msg_file:
-        return send_file(msg_file), 200
-    return 'Welcome to Search2Bag!', 200
+    message = \
+        '<h2>Welcome to Search2Bag</h2>' \
+        '<p>See <a href="https://github.com/globusonline/search2bag">here</a>'\
+        ' for documentation.</p>'
+    return render_template_string(message), 200
 
 @app.route('/bag', methods=['POST'])
 def bag():
