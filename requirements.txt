@@ -1,0 +1,5 @@
+flask
+boto3
+-e git+https://github.com/ini-bdds/minid#egg=minid
+-e git+https://github.com/ini-bdds/bdbag#egg=bdbag
+#-e git+http://github.com/ini-bdds/bdbag/archive/master.zip#egg=bdbag
