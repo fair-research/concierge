@@ -13,10 +13,7 @@ class Config(object):
     MINID_CODE = ""
     MINID_TEST = False
 
+    BAG_ARCHIVE_FORMAT = 'zip'
+
     GLOBUS_FILE = "https://www.globus.org/app/transfer?origin_id=6a84efa0-4a94-11e6-8233-22000b97daec&origin_path=%2Ffdab4915-a1f0-42f1-8579-e1999d0648ca%2F"
     BUCKET_NAME = "portal-sc17-nick-globuscs-info"
-
-try:
-    from local_config import Config
-except ImportError:
-    print('No config overrides set, you may need to configure minid and aws.')
