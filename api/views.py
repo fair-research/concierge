@@ -1,9 +1,15 @@
 import os
-from flask import jsonify, request
+from flask import jsonify, request, send_file
 
 from app import app
 from api.utils import create_bag_archive, create_minid, upload_to_s3
 
+@app.route('/')
+def index():
+    msg_file = app.config.get('API_WELCOME_MESSAGE', '')
+    if msg_file:
+        return send_file(msg_file), 200
+    return 'Welcome to Search2Bag!', 200
 
 @app.route('/bag', methods=['POST'])
 def bag():

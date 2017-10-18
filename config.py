@@ -12,6 +12,7 @@ class Config(object):
     MINID_EMAIL = ""
     MINID_CODE = ""
     MINID_TEST = False
+    API_WELCOME_MESSAGE = 'api/README.txt'
 
     BAG_ARCHIVE_FORMAT = 'zip'
 
