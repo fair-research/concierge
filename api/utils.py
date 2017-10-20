@@ -27,16 +27,31 @@ def create_bag_archive(metadata):
     return archive_name
 
 
-def create_minid(filename, aws_bucket_filename):
+def _register_minid(filename, aws_bucket_filename, minid_email):
     checksum = minid_client_api.compute_checksum(filename)
     return minid_client_api.register_entity(app.config['MINID_SERVER'],
                                          checksum,
-                                         app.config['MINID_EMAIL'],
-                                         app.config['MINID_CODE'],
+                                         minid_email,
+                                         app.config['MINID_SERVICE_TOKEN'],
                                          ["https://s3.amazonaws.com/%s/%s.zip" % (app.config['BUCKET_NAME'], aws_bucket_filename)],
                                          "ENCODE BDBag",
                                          app.config['MINID_TEST'])
 
+def create_minid(filename, aws_bucket_filename, minid_user, minid_email):
+    minid = _register_minid(filename, aws_bucket_filename, minid_email)
+    if not minid \
+            and not minid_client_api.get_user(
+                app.config['MINID_SERVER'],
+                minid_email).get('user'):
+        minid_client_api.register_user(app.config['MINID_SERVER'],
+                                       minid_email,
+                                       minid_user,
+                                       '', # ORCID is not currently used
+                                       app.config['MINID_SERVICE_TOKEN'])
+        minid = _register_minid(filename, aws_bucket_filename, minid_email)
+        if not minid:
+            raise Exception("Failed to register minid and user autoregistration failed")
+    return minid
 
 def upload_to_s3(filename, key):
     s3 = boto3.resource('s3', aws_access_key_id=app.config['AWS_ACCESS_KEY_ID'], aws_secret_access_key=app.config['AWS_SECRET_ACCESS_KEY'])

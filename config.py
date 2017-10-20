@@ -1,10 +1,8 @@
 class Config(object):
     DEBUG = False
     TESTING = False
-    
-    #SERVER_NAME = "http://localhost:5001"
 
-    #APPLICATION_ROOT = '/minid'
+
     AWS_ACCESS_KEY_ID = ""
     AWS_SECRET_ACCESS_KEY = ""
     CREATE_MINID = True
@@ -12,6 +10,7 @@ class Config(object):
     MINID_EMAIL = ""
     MINID_CODE = ""
     MINID_TEST = False
+    MINID_SERVICE_TOKEN = ''
     API_WELCOME_MESSAGE = 'api/README.txt'
 
     BAG_ARCHIVE_FORMAT = 'zip'
