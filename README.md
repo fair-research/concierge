@@ -34,6 +34,8 @@ This will start the flask server running on `http://localhost:5000`
 POST with JSON matching the following format. The following example is valid:
 
     {
+        "minid_user": "Firstname Lastname",
+        "minid_email": "name@example.org",
         "remote_files_manifest": [
             {
                 "url":"https://raw.githubusercontent.com/ini-bdds/bdbag/master/profiles/bdbag-profile.json",
@@ -50,6 +52,15 @@ POST with JSON matching the following format. The following example is valid:
             }
         ]
     }
+
+Notes about the fields:
+
+* `minid_user`: Is the name of the user, and will show up as the author of the minid/bdbag
+* `minid_email`: Is the email of the person creating the bag. Search2Bag will automatically
+register the minid by this email if they are not already registered.
+* `remote_files_manifest`: These fields will be passed down to bdbag and can be found in more detail [here](https://github.com/ini-bdds/bdbag/blob/master/doc/config.md#remote-file-manifest).
+    * `url`: **Required** The URL of the content. Only protocols allowed by bdbag are allowed.
+    * `filename`: **Required** The name of the file
 
 You will receive a response in the following format:
 
