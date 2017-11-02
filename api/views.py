@@ -18,6 +18,9 @@ def bag():
     remote_files_manifest = request.json.get('remote_files_manifest')
     minid_user = request.json.get('minid_user')
     minid_email = request.json.get('minid_email')
+    minid_title = request.json.get('minid_title')
+    minid_test = request.json.get('minid_test', False)
+
 
     if not remote_files_manifest:
         return 'Invalid Arguments', 400
@@ -31,10 +34,15 @@ def bag():
     s3_bag_filename = os.path.basename(bag_filename)
     upload_to_s3(bag_filename, s3_bag_filename)
 
-    response_dict = {"uri" : "https://s3.amazonaws.com/%s/%s.zip" % (app.config['BUCKET_NAME'], s3_bag_filename)}
+    response_dict = {"uri" : "https://s3.amazonaws.com/%s/%s" % (app.config['BUCKET_NAME'], s3_bag_filename)}
 
     if app.config['CREATE_MINID']:
-        response_dict["minid"] = create_minid(bag_filename, s3_bag_filename, minid_user, minid_email)
+        response_dict["minid"] = create_minid(bag_filename,
+                                              s3_bag_filename,
+                                              minid_user,
+                                              minid_email,
+                                              minid_title,
+                                              minid_test)
     os.remove(bag_filename)
 
     response_dict["globus_uri"] = app.config['GLOBUS_FILE']

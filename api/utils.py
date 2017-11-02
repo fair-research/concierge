@@ -21,24 +21,24 @@ def create_bag_archive(metadata):
                    )
     bdbag_api.archive_bag(bag_name, app.config['BAG_ARCHIVE_FORMAT'])
 
-    archive_name = '{}.{}'.format(bag_name,app.config['BAG_ARCHIVE_FORMAT'])
+    archive_name = '{}.{}'.format(bag_name, app.config['BAG_ARCHIVE_FORMAT'])
     bdbag_api.revert_bag(bag_name)
     os.remove(metadata_file)
     return archive_name
 
 
-def _register_minid(filename, aws_bucket_filename, minid_email):
+def _register_minid(filename, aws_bucket_filename, minid_email, minid_title, minid_test):
     checksum = minid_client_api.compute_checksum(filename)
     return minid_client_api.register_entity(app.config['MINID_SERVER'],
                                          checksum,
                                          minid_email,
                                          app.config['MINID_SERVICE_TOKEN'],
-                                         ["https://s3.amazonaws.com/%s/%s.zip" % (app.config['BUCKET_NAME'], aws_bucket_filename)],
-                                         "ENCODE BDBag",
-                                         app.config['MINID_TEST'])
+                                         ["https://s3.amazonaws.com/%s/%s" % (app.config['BUCKET_NAME'], aws_bucket_filename)],
+                                         minid_title,
+                                         minid_test)
 
-def create_minid(filename, aws_bucket_filename, minid_user, minid_email):
-    minid = _register_minid(filename, aws_bucket_filename, minid_email)
+def create_minid(filename, aws_bucket_filename, minid_user, minid_email, minid_title, minid_test):
+    minid = _register_minid(filename, aws_bucket_filename, minid_email, minid_title, minid_test)
     if not minid \
             and not minid_client_api.get_user(
                 app.config['MINID_SERVER'],
