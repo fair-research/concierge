@@ -55,7 +55,11 @@ def create_minid(filename, aws_bucket_filename, minid_user, minid_email, minid_t
 
 def upload_to_s3(filename, key):
     s3 = boto3.resource('s3', aws_access_key_id=app.config['AWS_ACCESS_KEY_ID'], aws_secret_access_key=app.config['AWS_SECRET_ACCESS_KEY'])
-    data = open(filename, 'rb')
-    s3.Bucket(app.config['BUCKET_NAME']).put_object(Key=key, Body=data)
+    with open(filename, 'rb') as data:
+        s3.Bucket(app.config['BUCKET_NAME']).upload_fileobj(
+            data,
+            key,
+            ExtraArgs={'ACL': 'public-read'}
+        )
 
 
