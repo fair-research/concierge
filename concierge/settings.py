@@ -93,7 +93,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'concierge.wsgi.application'
+WSGI_APPLICATION = 'wsgi.app'
 
 
 # Database
