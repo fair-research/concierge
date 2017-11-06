@@ -21,7 +21,7 @@ def staging_dir_check(app_configs, **kwargs):
                      'the {} directory.'.format(settings.BAG_STAGING_DIR),
                 obj=settings,
                 id='api.E002',
-               )]
+                )]
 
     if not os.path.exists(settings.BAG_STAGING_DIR):
         os.mkdir(settings.BAG_STAGING_DIR)
