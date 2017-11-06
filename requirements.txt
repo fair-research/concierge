@@ -2,4 +2,4 @@ django
 django-rest-framework
 django-rest-swagger
 boto3>=1.4.7
-#git+https://github.com/ini-bdds/minid@v0.1-beta#egg=minid
+git+https://github.com/globusonline/minid@develop#egg=minid
