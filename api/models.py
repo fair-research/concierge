@@ -1,11 +1,5 @@
-import os
 from django.db import models
-from django.conf import settings
 
-# from api.utils import create_bag_archive, create_minid, upload_to_s3
-
-
-# Create your models here.
 
 class Bag(models.Model):
     minid_id = models.CharField(max_length=30)

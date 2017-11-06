@@ -8,10 +8,15 @@ from api.views import BagViewSet
 router = routers.DefaultRouter()
 router.register(r'bags', BagViewSet)
 
-schema_view = get_schema_view(title='Bag API', renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer])
+schema_view = get_schema_view(title='Bag API',
+                              renderer_classes=[
+                                  OpenAPIRenderer,
+                                  SwaggerUIRenderer
+                              ]
+                              )
 
 # Inlcude the schema view in our urls.
 urlpatterns = [
-    url(r'^', schema_view, name="docs"),
     url(r'^api/', include(router.urls)),
+    url(r'^', schema_view, name="docs"),
 ]

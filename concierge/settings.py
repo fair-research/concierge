@@ -37,6 +37,9 @@ AWS_BUCKET_NAME = "portal-sc17-nick-globuscs-info"
 MINID_SERVER = "https://portal.sc17.nick.globuscs.info/minid"
 MINID_TEST = False
 MINID_SERVICE_TOKEN = ''
+
+# Bag Settings
+BAG_STAGING_DIR = '/tmp/bag_staging'
 BAG_ARCHIVE_FORMAT = 'zip'
 
 
@@ -56,7 +59,7 @@ INSTALLED_APPS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        #'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+        # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
         # We don't support auth via globus tokens yet
         'rest_framework.permissions.AllowAny'
     ],
@@ -109,16 +112,20 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        'NAME': 'django.contrib.auth.password_validation.'
+                'UserAttributeSimilarityValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'NAME': 'django.contrib.auth.password_validation.'
+                'MinimumLengthValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        'NAME': 'django.contrib.auth.password_validation.'
+                'CommonPasswordValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        'NAME': 'django.contrib.auth.password_validation.'
+                'NumericPasswordValidator',
     },
 ]
 
@@ -143,6 +150,6 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 try:
-    from concierge.local_settings import *
+    from concierge.local_settings import *  # NOQA
 except ImportError:
     pass

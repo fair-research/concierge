@@ -15,20 +15,16 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     remote_files_manifest = serializers.JSONField(required=True)
     location = serializers.CharField(max_length=255, read_only=True)
 
-
     class Meta:
         model = Bag
         fields = ('id', 'minid_id', 'minid_user', 'minid_email',
                   'minid_title', 'remote_files_manifest', 'location')
 
     def create(self, validated_data):
-        print(validated_data)
         validated_manifest = validated_data['remote_files_manifest']
 
-        try:
-            bag_filename = create_bag_archive(validated_manifest)
-        except Exception as e:
-            raise
+        bag_metadata = {'Creator-Name': validated_data['minid_user']}
+        bag_filename = create_bag_archive(validated_manifest, **bag_metadata)
 
         s3_bag_filename = os.path.basename(bag_filename)
         upload_to_s3(bag_filename, s3_bag_filename)
