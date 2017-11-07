@@ -2,13 +2,14 @@ from django.conf.urls import url, include
 from rest_framework import routers
 from rest_framework.schemas import get_schema_view
 from rest_framework_swagger.renderers import SwaggerUIRenderer, OpenAPIRenderer
-from api.views import BagViewSet
+from api.views import BagViewSet, StageBagViewSet
 
 
 router = routers.DefaultRouter()
 router.register(r'bags', BagViewSet)
+router.register(r'stagebag', StageBagViewSet)
 
-schema_view = get_schema_view(title='Bag API',
+schema_view = get_schema_view(title='Concierge API',
                               renderer_classes=[
                                   OpenAPIRenderer,
                                   SwaggerUIRenderer

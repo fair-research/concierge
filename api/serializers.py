@@ -1,6 +1,6 @@
 import os
 from rest_framework import serializers
-from api.models import Bag
+from api.models import Bag, StageBag
 from api.utils import create_bag_archive, create_minid, upload_to_s3
 from django.conf import settings
 
@@ -17,7 +17,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Bag
-        fields = ('id', 'minid_id', 'minid_user', 'minid_email',
+        fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
                   'minid_title', 'remote_files_manifest', 'location')
 
     def create(self, validated_data):
@@ -44,3 +44,40 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
         return Bag.objects.create(minid_id=minid,
                                   minid_email=validated_data['minid_email'],
                                   location=validated_data['location'])
+
+
+class StageBagSerializer(serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = StageBag
+        fields = '__all__'
+
+    def create(self, validated_data):
+        # NONE OF THIS WORKS YET
+        # location = validated_data['location']
+        # globus_destination_endpoint, globus_destination_path = location.replace('globus://', '').split(':')
+        # payload = {}
+        # for bag_minid in validated_data['bad_minids']:
+        #     fetch_bag(bag_minid)
+        #     manifests = get_bag_manifest()
+        #     for manifest in manifests:
+        #         previous_data = payload.get(manifest['globus_endpoint'], [])
+        #         new_data = previous_data.append(manifest['urls'])
+        #         payload[manifest['globus_endpoint']] = new_data
+
+        # tc = globus_sdk.TransferClient(...)
+        # for globus_source_endpoint, data in payload:
+        #     tdata = globus_sdk.TransferData(tc,
+        #                                 globus_source_endpoint,
+        #                                 globus_destination_endpoint,
+        #                                 label="SDK example",
+        #                                 sync_level="checksum"
+        #                                 )
+        #     for source_path in data:
+        #         tdata.add_item("/source/path/dir/", validated_data['prefix'] + "/dest/path/dir/",
+        #         recursive = True)
+        #     transfer_result = tc.submit_transfer(tdata)
+
+
+
+        return StageBag.objects.create(**validated_data)

@@ -10,3 +10,11 @@ class Bag(models.Model):
     minid_title = ''
     minid_test = False
     remote_files_manifest = {}
+
+
+class StageBag(models.Model):
+
+    location = models.CharField(max_length=512)
+    bag_minids = models.TextField()
+    # TODO: Find actual length of transfer token
+    transfer_token = models.CharField(max_length=64)
