@@ -11,22 +11,36 @@ from bdbag import bdbag_api
 def create_bag_archive(metadata, bag_algorithms=('md5', 'sha256'),
                        **bag_metadata):
     bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
-    metadata_file = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
-    with open(metadata_file, 'w') as f:
-        f.write(json.dumps(metadata))
+    remote_manifest_filename = join(settings.BAG_STAGING_DIR,
+                                    str(uuid.uuid4()))
+
+    remote_manifest_formatted = _format_remote_file_manifest(metadata,
+                                                             bag_algorithms)
+    with open(remote_manifest_filename, 'w') as f:
+        f.write(json.dumps(remote_manifest_formatted))
 
     os.mkdir(bag_name)
     bdbag_api.make_bag(bag_name,
                        algs=bag_algorithms,
                        metadata=dict(bag_metadata),
-                       remote_file_manifest=metadata_file,
+                       remote_file_manifest=remote_manifest_filename,
                        )
     bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
 
     archive_name = '{}.{}'.format(bag_name, settings.BAG_ARCHIVE_FORMAT)
     bdbag_api.revert_bag(bag_name)
-    os.remove(metadata_file)
+    os.remove(remote_manifest_filename)
     return archive_name
+
+
+def _format_remote_file_manifest(manifest, algorithms):
+    new_manifest = manifest.copy()
+    for file in new_manifest:
+        # If hash doesn't exist, add the empty string for each algorithm entry
+        algs = {alg: file.get(alg, '') for alg in algorithms}
+        file.update(algs)
+        file['length'] = file.get('length', 0)
+    return new_manifest
 
 
 def _register_minid(filename, aws_bucket_filename,
