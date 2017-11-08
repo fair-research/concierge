@@ -50,6 +50,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     bag_minids = serializers.JSONField(required=True)
+    transfer_token = serializers.CharField(write_only=True, required=True)
     transfer_catalog = serializers.JSONField(read_only=True)
     error_catalog = serializers.JSONField(read_only=True)
     transfer_task_ids = serializers.JSONField(read_only=True)
