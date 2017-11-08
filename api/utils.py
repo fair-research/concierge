@@ -41,13 +41,12 @@ def create_bag_archive(metadata, bag_algorithms=('md5', 'sha256'),
 
 
 def _format_remote_file_manifest(manifest, algorithms):
-    new_manifest = manifest.copy()
-    for file in new_manifest:
+    for file in manifest:
         # If hash doesn't exist, add the empty string for each algorithm entry
         algs = {alg: file.get(alg, '') for alg in algorithms}
         file.update(algs)
         file['length'] = file.get('length', 0)
-    return new_manifest
+    return manifest
 
 
 def _register_minid(filename, aws_bucket_filename,
