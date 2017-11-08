@@ -7,6 +7,7 @@ class BagViewSet(viewsets.ModelViewSet):
     queryset = Bag.objects.all()
     serializer_class = BagSerializer
 
+
 class StageBagViewSet(viewsets.ModelViewSet):
     queryset = StageBag.objects.all()
     serializer_class = StageBagSerializer

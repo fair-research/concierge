@@ -2,10 +2,18 @@ import os
 from os.path import join
 import json
 import uuid
+import requests
+from six.moves.urllib_parse import urlsplit
 from django.conf import settings
 import boto3
+import globus_sdk
 from minid_client import minid_client_api
+import bagit
 from bdbag import bdbag_api
+
+# When doing a GET request for binary files, load chunks in 1 kilobyte
+# increments
+HTTP_CHUNK_SIZE = 2**10
 
 
 def create_bag_archive(metadata, bag_algorithms=('md5', 'sha256'),
@@ -28,7 +36,6 @@ def create_bag_archive(metadata, bag_algorithms=('md5', 'sha256'),
     bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
 
     archive_name = '{}.{}'.format(bag_name, settings.BAG_ARCHIVE_FORMAT)
-    bdbag_api.revert_bag(bag_name)
     os.remove(remote_manifest_filename)
     return archive_name
 
@@ -91,3 +98,81 @@ def upload_to_s3(filename, key):
             key,
             ExtraArgs={'ACL': 'public-read'}
         )
+
+
+def fetch_bags(bags):
+    """Given a list of bag models, follow their location and
+    fetch the data associated with them, if it doesn't already
+    exist on the filesystem. Returns a list of bagit bag objects"""
+    bagit_bags = []
+    for bag in bags:
+        bag_name = os.path.basename(bag.location)
+        local_bag_archive = os.path.join(settings.BAG_STAGING_DIR, bag_name)
+        if not os.path.exists(local_bag_archive):
+            r = requests.get(bag.location, stream=True)
+            if r.status_code == 200:
+                with open(local_bag_archive, 'wb') as f:
+                    for chunk in r.iter_content(HTTP_CHUNK_SIZE):
+                        f.write(chunk)
+        local_bag, _ = os.path.splitext(local_bag_archive)
+        if not os.path.exists(local_bag):
+            bdbag_api.extract_bag(local_bag_archive,
+                                  os.path.dirname(local_bag))
+        bagit_bag = bagit.Bag(local_bag)
+        bagit_bags.append(bagit_bag)
+    return bagit_bags
+
+
+def catalog_transfer_manifest(bagit_bags):
+    """Given a list of bagit bags, return a catalogue of all files
+    organized by endpoint, and the list of files that can't be
+    transferred.
+
+    Returns tuple: ( catalog_dict, error_catalog_dict )
+    Example: (
+        {
+            '<Endpoint UUID>': ['filename1', 'filename2'],
+            '<Endpoint UUID>': ['filename3', 'filename4']
+        },
+        {
+            'unsupported_protocol': ['filename5', 'filename6']
+        }
+    )
+    """
+    endpoint_catalog = {}
+    error_catalog = {}
+    for bag in bagit_bags:
+        for url, size, filename in bag.fetch_entries():
+            surl = urlsplit(url)
+            if surl.scheme not in settings.SUPPORTED_STAGING_PROTOCOLS:
+                prot_errors = error_catalog.get('unsupported_protocol', [])
+                prot_errors.append(url)
+                error_catalog['unsupported_protocol'] = prot_errors
+            globus_endpoint = surl.netloc.replace(':', '')
+            payload = endpoint_catalog.get(globus_endpoint, [])
+            payload.append(surl.path)
+            endpoint_catalog[globus_endpoint] = payload
+    return endpoint_catalog, error_catalog
+
+
+def transfer_catalog(transfer_manifest, dest_endpoint,
+                     dest_prefix, transfer_token):
+
+    task_ids = []
+    transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
+    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    for globus_source_endpoint, data_list in transfer_manifest.items():
+        tdata = globus_sdk.TransferData(tc,
+                                        globus_source_endpoint,
+                                        dest_endpoint,
+                                        label=settings.SERVICE_NAME,
+                                        sync_level='checksum'
+                                        )
+        for item in data_list:
+            tdata.add_item(
+                item,
+                '/'.join((dest_prefix, os.path.basename(item)))
+            )
+        task = tc.submit_transfer(tdata)
+        task_ids.append(task['task_id'])
+    return task_ids

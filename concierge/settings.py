@@ -42,6 +42,11 @@ MINID_SERVICE_TOKEN = ''
 BAG_STAGING_DIR = '/tmp/bag_staging'
 BAG_ARCHIVE_FORMAT = 'zip'
 
+# Other
+SUPPORTED_STAGING_PROTOCOLS = ['globus']
+# Shows up as a label on user globus transfer lists
+SERVICE_NAME = 'Concierge Service'
+
 
 # Application definition
 

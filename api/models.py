@@ -14,7 +14,10 @@ class Bag(models.Model):
 
 class StageBag(models.Model):
 
-    location = models.CharField(max_length=512)
+    destination_endpoint = models.CharField(max_length=512)
+    destination_path_prefix = models.CharField(max_length=255)
     bag_minids = models.TextField()
-    # TODO: Find actual length of transfer token
-    transfer_token = models.CharField(max_length=64)
+    transfer_token = models.CharField(max_length=255)
+    transfer_catalog = models.TextField()
+    error_catalog = models.TextField()
+    transfer_task_ids = models.TextField()
