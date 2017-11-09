@@ -172,7 +172,7 @@ def transfer_catalog(transfer_manifest, dest_endpoint,
                                                 ['DATA_TYPE'] == 'file_list'
             tdata.add_item(
                 item,
-                '/'.join((dest_prefix, os.path.basename(item))),
+                '/'.join((dest_prefix, item)),
                 recursive=recursive
             )
         task = tc.submit_transfer(tdata)
