@@ -168,9 +168,12 @@ def transfer_catalog(transfer_manifest, dest_endpoint,
                                         sync_level='checksum'
                                         )
         for item in data_list:
+            recursive = tc.operation_ls(globus_source_endpoint, path=item) \
+                                                ['DATA_TYPE'] == 'file_list'
             tdata.add_item(
                 item,
-                '/'.join((dest_prefix, os.path.basename(item)))
+                '/'.join((dest_prefix, os.path.basename(item))),
+                recursive=recursive
             )
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])
