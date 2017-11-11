@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 from rest_framework import viewsets
 from api.models import Bag, StageBag
 from api.serializers import BagSerializer, StageBagSerializer
