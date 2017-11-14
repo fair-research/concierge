@@ -165,7 +165,7 @@ def transfer_catalog(transfer_manifest, dest_endpoint,
                                         globus_source_endpoint,
                                         dest_endpoint,
                                         label=settings.SERVICE_NAME,
-                                        sync_level='checksum'
+                                        sync_level='mtime'
                                         )
         for item in data_list:
             recursive = tc.operation_ls(globus_source_endpoint, path=item) \
