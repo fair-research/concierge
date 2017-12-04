@@ -19,6 +19,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     minid_id = serializers.CharField(max_length=255, read_only=True)
     minid_user = serializers.CharField(allow_blank=False, max_length=255,
                                        required=True)
+    access_token = serializers.CharField(write_only=True, required=True)
     minid_title = serializers.CharField(allow_blank=False, max_length=255,
                                         required=True)
     remote_files_manifest = serializers.JSONField(required=True)
@@ -26,8 +27,9 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Bag
-        fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
-                  'minid_title', 'remote_files_manifest', 'location')
+        fields = ('id', 'url', 'minid_id', 'minid_user', 'access_token',
+                  'minid_email', 'minid_title', 'remote_files_manifest',
+                  'location')
 
     def create(self, validated_data):
         validated_manifest = validated_data['remote_files_manifest']
@@ -47,7 +49,8 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                              validated_data['minid_user'],
                              validated_data['minid_email'],
                              validated_data['minid_title'],
-                             True)
+                             True,
+                             validated_data['access_token'])
 
         os.remove(bag_filename)
         return Bag.objects.create(minid_id=minid,

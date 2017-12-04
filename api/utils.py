@@ -56,41 +56,47 @@ def _format_remote_file_manifest(manifest, algorithms):
 
 
 def _register_minid(filename, aws_bucket_filename,
-                    minid_email, minid_title, minid_test):
+                    minid_email, minid_title, minid_test, globus_auth_token):
     checksum = minid_client_api.compute_checksum(filename)
+    locations = ["https://s3.amazonaws.com/%s/%s" % (
+                             settings.AWS_BUCKET_NAME,
+                             aws_bucket_filename
+                        )]
     return minid_client_api.\
         register_entity(
                         settings.MINID_SERVER,
                         checksum,
                         minid_email,
-                        settings.MINID_SERVICE_TOKEN,
-                        ["https://s3.amazonaws.com/%s/%s" % (
-                             settings.AWS_BUCKET_NAME,
-                             aws_bucket_filename
-                        )],
+                        None,
+                        #settings.MINID_SERVICE_TOKEN,
+                        locations,
                         minid_title,
-                        minid_test
+                        minid_test,
+                        globus_auth_token=globus_auth_token
                         )
 
 
 def create_minid(filename, aws_bucket_filename, minid_user,
-                 minid_email, minid_title, minid_test):
-    minid = _register_minid(filename, aws_bucket_filename,
-                            minid_email, minid_title, minid_test)
-    if not minid \
-            and not minid_client_api.get_user(
-                settings.MINID_SERVER,
-                minid_email).get('user'):
-        minid_client_api.register_user(settings.MINID_SERVER,
-                                       minid_email,
-                                       minid_user,
-                                       '',  # ORCID is not currently used
-                                       settings.MINID_SERVICE_TOKEN)
+                 minid_email, minid_title, minid_test, globus_auth_token):
+    try:
+
         minid = _register_minid(filename, aws_bucket_filename,
-                                minid_email, minid_title, minid_test)
-        if not minid:
-            raise Exception("Failed to register minid "
-                            "and user autoregistration failed")
+                                minid_email, minid_title, minid_test,
+                                globus_auth_token=globus_auth_token)
+
+    except minid_client_api.MinidAPIException as minid_exc:
+        if minid_exc.type == 'UserNotRegistered':
+            minid_client_api.register_user(settings.MINID_SERVER,
+                                           minid_email,
+                                           minid_user,
+                                           '',  # ORCID is not currently used
+                                           globus_auth_token=globus_auth_token
+                                           )
+            minid = _register_minid(filename, aws_bucket_filename,
+                                    minid_email, minid_title, minid_test,
+                                    globus_auth_token=globus_auth_token)
+        else:
+            raise
     return minid
 
 
