@@ -168,13 +168,18 @@ def transfer_catalog(transfer_manifest, dest_endpoint,
                                         sync_level='mtime'
                                         )
         for item in data_list:
-            recursive = tc.operation_ls(globus_source_endpoint, path=item) \
-                                                ['DATA_TYPE'] == 'file_list'
             tdata.add_item(
                 item,
                 '/'.join((dest_prefix, item)),
-                recursive=recursive
+                recursive=is_globus_dir(tc, globus_source_endpoint, item)
             )
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])
     return task_ids
+
+
+def is_globus_dir(tc, endpoint, item):
+    item_parent = os.path.dirname(item) if item != '/' else '/'
+    parent_dir = tc.operation_ls(endpoint, path=item_parent)
+    f = [d for d in parent_dir if d['name'] == os.path.basename(item)]
+    return str(f[0]['DATA_TYPE']) == 'file_list'
