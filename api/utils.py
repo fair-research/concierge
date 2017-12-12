@@ -3,14 +3,18 @@ from os.path import join
 import json
 import uuid
 import requests
+import logging
 from six.moves.urllib_parse import urlsplit
 from django.conf import settings
+from rest_framework.exceptions import ValidationError
 import boto3
 import globus_sdk
 from minid_client import minid_client_api
 import bagit
 from bdbag import bdbag_api
+from api.exc import ConciergeException
 
+log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
 # increments
 HTTP_CHUNK_SIZE = 2**10
@@ -147,6 +151,7 @@ def catalog_transfer_manifest(bagit_bags):
                 prot_errors = error_catalog.get('unsupported_protocol', [])
                 prot_errors.append(url)
                 error_catalog['unsupported_protocol'] = prot_errors
+                continue
             globus_endpoint = surl.netloc.replace(':', '')
             payload = endpoint_catalog.get(globus_endpoint, [])
             payload.append(surl.path)
@@ -155,31 +160,31 @@ def catalog_transfer_manifest(bagit_bags):
 
 
 def transfer_catalog(transfer_manifest, dest_endpoint,
-                     dest_prefix, transfer_token):
-
+                     dest_prefix, transfer_token,
+                     sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
     transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
     tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    tc.endpoint_autoactivate(dest_endpoint)
+    if not transfer_manifest:
+        raise ValidationError('No valid data to transfer',
+                              code='no_data')
     for globus_source_endpoint, data_list in transfer_manifest.items():
+        log.debug('Starting transfer from {} to {}:{} contaiting {} files'
+                  .format(globus_source_endpoint, dest_endpoint, dest_prefix,
+                          len(data_list)))
+        tc.endpoint_autoactivate(globus_source_endpoint)
         tdata = globus_sdk.TransferData(tc,
                                         globus_source_endpoint,
                                         dest_endpoint,
                                         label=settings.SERVICE_NAME,
-                                        sync_level='mtime'
+                                        sync_level=sync_level
                                         )
         for item in data_list:
             tdata.add_item(
                 item,
-                '/'.join((dest_prefix, item)),
-                recursive=is_globus_dir(tc, globus_source_endpoint, item)
+                '/'.join((dest_prefix, item))
             )
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])
     return task_ids
-
-
-def is_globus_dir(tc, endpoint, item):
-    item_parent = os.path.dirname(item) if item != '/' else '/'
-    parent_dir = tc.operation_ls(endpoint, path=item_parent)
-    f = [d for d in parent_dir if d['name'] == os.path.basename(item)]
-    return str(f[0]['DATA_TYPE']) == 'file_list'
