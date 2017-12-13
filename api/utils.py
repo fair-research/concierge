@@ -4,14 +4,15 @@ import json
 import uuid
 import requests
 import logging
-from six.moves.urllib_parse import urlsplit
-from django.conf import settings
-from rest_framework.exceptions import ValidationError
 import boto3
 import globus_sdk
+from six.moves.urllib_parse import urlsplit
+from django.conf import settings
 from minid_client import minid_client_api
 import bagit
 from bdbag import bdbag_api
+
+from api.models import Bag
 from api.exc import ConciergeException
 
 log = logging.getLogger(__name__)
@@ -103,10 +104,25 @@ def upload_to_s3(filename, key):
         )
 
 
-def fetch_bags(bags):
-    """Given a list of bag models, follow their location and
+def _resolve_minids_to_bags(bag_minids):
+    bags = Bag.objects.filter(
+        minid_id__in=bag_minids)
+    if len(bags) != len(bag_minids):
+        bad_bags = [b for b in bag_minids
+                    if b not in [bg.minid_id for bg in bags]]
+        raise ConciergeException({
+            'error': 'Bags not created with the concierge service are not '
+                     'supported yet: {}'.format(','.join(bad_bags)),
+            'bags': bad_bags
+        })
+    return bags
+
+
+def fetch_bags(minids):
+    """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
+    bags = _resolve_minids_to_bags(minids)
     bagit_bags = []
     for bag in bags:
         bag_name = os.path.basename(bag.location)
@@ -156,6 +172,11 @@ def catalog_transfer_manifest(bagit_bags):
             payload = endpoint_catalog.get(globus_endpoint, [])
             payload.append(surl.path)
             endpoint_catalog[globus_endpoint] = payload
+    if not endpoint_catalog:
+        raise ConciergeException({
+            'error': 'No valid data to transfer',
+            'error_catalog': error_catalog
+        })
     return endpoint_catalog, error_catalog
 
 

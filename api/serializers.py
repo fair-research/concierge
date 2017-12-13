@@ -85,23 +85,8 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         try:
-            bag_minids = json.loads(validated_data['bag_minids'])
-            bags = Bag.objects.filter(
-                minid_id__in=bag_minids)
-            if len(bags) != len(bag_minids):
-                raise ValidationError({
-                    'bag_minids': 'Non-registered concierge bags not '
-                                  'supported yet.',
-                    'bags': [b for b in bag_minids
-                                   if b not in [bg.minid_id for bg in bags]]
-                })
-            bagit_bags = fetch_bags(bags)
+            bagit_bags = fetch_bags(json.loads(validated_data['bag_minids']))
             catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
-            if not catalog:
-                raise ValidationError({
-                    'bag_minids': 'No valid data to transfer',
-                    'error_catalog': error_catalog
-                })
             task_ids = transfer_catalog(
                 catalog,
                 validated_data['destination_endpoint'],
@@ -116,5 +101,5 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             stage_bag_data.update(validated_data)
             return StageBag.objects.create(**stage_bag_data)
         except globus_sdk.exc.TransferAPIError as te:
-            if te.code == 'NoCredException':
-                raise GlobusTransferException(detail={'error': te.message})
+            raise GlobusTransferException(detail={'error': te.message,
+                                          'code': te.code})

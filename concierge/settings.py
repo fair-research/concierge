@@ -161,6 +161,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'concierge': {
+            'handlers': ['stream'],
+            'level': 'DEBUG',
+            'propagate': True,
+        }
     },
 }
 
