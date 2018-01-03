@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/1.11/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.11/ref/settings/
 """
-
+from __future__ import unicode_literals
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -41,6 +41,11 @@ MINID_SERVICE_TOKEN = ''
 # Bag Settings
 BAG_STAGING_DIR = '/tmp/bag_staging'
 BAG_ARCHIVE_FORMAT = 'zip'
+
+# Other
+SUPPORTED_STAGING_PROTOCOLS = ['globus']
+# Shows up as a label on user globus transfer lists
+SERVICE_NAME = 'Concierge Service'
 
 
 # Application definition

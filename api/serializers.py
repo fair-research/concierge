@@ -1,7 +1,10 @@
+from __future__ import unicode_literals
 import os
+import json
 from rest_framework import serializers
-from api.models import Bag
-from api.utils import create_bag_archive, create_minid, upload_to_s3
+from api.models import Bag, StageBag
+from api.utils import (create_bag_archive, create_minid, upload_to_s3,
+                       fetch_bags, catalog_transfer_manifest, transfer_catalog)
 from django.conf import settings
 
 
@@ -17,7 +20,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Bag
-        fields = ('id', 'minid_id', 'minid_user', 'minid_email',
+        fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
                   'minid_title', 'remote_files_manifest', 'location')
 
     def create(self, validated_data):
@@ -44,3 +47,52 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
         return Bag.objects.create(minid_id=minid,
                                   minid_email=validated_data['minid_email'],
                                   location=validated_data['location'])
+
+
+class StageBagSerializer(serializers.HyperlinkedModelSerializer):
+
+    id = serializers.IntegerField(read_only=True)
+    bag_minids = serializers.JSONField(required=True)
+    transfer_token = serializers.CharField(write_only=True, required=True)
+    transfer_catalog = serializers.JSONField(read_only=True)
+    error_catalog = serializers.JSONField(read_only=True)
+    transfer_task_ids = serializers.JSONField(read_only=True)
+
+    class Meta:
+        model = StageBag
+        fields = '__all__'
+
+    def to_representation(self, obj):
+        ret_val = super(StageBagSerializer, self).to_representation(obj)
+        ret_val['bag_minids'] = json.loads(obj.bag_minids)
+        if ret_val.get('transfer_catalog'):
+            ret_val['transfer_catalog'] = json.loads(obj.transfer_catalog)
+        if ret_val.get('error_catalog'):
+            ret_val['error_catalog'] = json.loads(obj.error_catalog)
+        if ret_val.get('transfer_task_ids'):
+            ret_val['transfer_task_ids'] = json.loads(obj.transfer_task_ids)
+        return ret_val
+
+
+    def to_internal_value(self, obj):
+        obj['bag_minids'] = json.dumps(obj['bag_minids'])
+        ret_val = super(StageBagSerializer, self).to_internal_value(obj)
+        return ret_val
+
+
+    def create(self, validated_data):
+        bags = Bag.objects.filter(minid_id__in=json.loads(validated_data['bag_minids']))
+        bagit_bags = fetch_bags(bags)
+        catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
+        task_ids = transfer_catalog(catalog,
+                                    validated_data['destination_endpoint'],
+                                    validated_data['destination_path_prefix'],
+                                    validated_data['transfer_token']
+                                    )
+        stage_bag_data = {
+                          'transfer_catalog': json.dumps(catalog),
+                          'error_catalog': json.dumps(error_catalog),
+                          'transfer_task_ids': json.dumps(task_ids),
+                          }
+        stage_bag_data.update(validated_data)
+        return StageBag.objects.create(**stage_bag_data)
