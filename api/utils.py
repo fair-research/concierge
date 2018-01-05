@@ -14,7 +14,7 @@ import bagit
 from bdbag import bdbag_api
 
 from api.models import Bag
-from api.exc import ConciergeException
+from api.exc import ConciergeException, ServiceAuthException
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
@@ -55,48 +55,69 @@ def _format_remote_file_manifest(manifest, algorithms):
     return manifest
 
 
-def _register_minid(filename, aws_bucket_filename,
-                    minid_email, minid_title, minid_test, globus_auth_token):
+def _register_minid(minid_user, minid_email, minid_title, minid_test,
+                    globus_auth_token, checksum, locations):
+    try:
+        minid = minid_client_api.register_entity(
+            settings.MINID_SERVER,
+            checksum,
+            minid_email,
+            None,
+            locations,
+            minid_title,
+            minid_test,
+            globus_auth_token=globus_auth_token
+        )
+    except minid_client_api.MinidAPIException as minid_exc:
+        if minid_exc.type == 'UserNotRegistered':
+            try:
+                minid_client_api.register_user(
+                    settings.MINID_SERVER,
+                    minid_email,
+                    minid_user,
+                    '',  # ORCID is not currently used
+                    globus_auth_token=globus_auth_token
+                )
+                minid = minid_client_api.register_entity(
+                    settings.MINID_SERVER,
+                    checksum,
+                    minid_email,
+                    None,
+                    locations,
+                    minid_title,
+                    minid_test,
+                    globus_auth_token=globus_auth_token
+                )
+            except minid_client_api.MinidAPIException as minid_exc:
+                msg = 'Failed to created minid, user not registered and ' \
+                      'auto-registration failed: {}'.format(minid_exc.message)
+                if minid_exc.code in [401, 403]:
+                    raise ServiceAuthException(msg, code='minid_auth_error')
+                else:
+                    log.error('"{}": {}'.format(minid_email, msg))
+                    raise ConciergeException(msg, code='minid_auth_error')
+        else:
+            msg = 'Could not create minid: {}'.format(minid_exc.message)
+            if minid_exc.code in [401, 403]:
+                raise ServiceAuthException(msg, code='minid_auth_error')
+            else:
+                log.error('"{}": {}'.format(minid_email, msg))
+                raise ConciergeException(msg, code='minid_auth_error')
+    return minid
+
+
+def create_minid(filename, aws_bucket_filename, minid_user,
+                 minid_email, minid_title, minid_test, globus_auth_token):
     checksum = minid_client_api.compute_checksum(filename)
     locations = ["https://s3.amazonaws.com/%s/%s" % (
                              settings.AWS_BUCKET_NAME,
                              aws_bucket_filename
                         )]
-    return minid_client_api.\
-        register_entity(
-                        settings.MINID_SERVER,
-                        checksum,
-                        minid_email,
-                        None,
-                        #settings.MINID_SERVICE_TOKEN,
-                        locations,
-                        minid_title,
-                        minid_test,
-                        globus_auth_token=globus_auth_token
-                        )
+    log.debug('Computed Minid Checksum.')
+    minid = _register_minid(minid_user, minid_email, minid_title, minid_test,
+                            globus_auth_token, checksum, locations)
+    log.debug('Created new minid for user {}: {}'.format(minid_user, minid))
 
-
-def create_minid(filename, aws_bucket_filename, minid_user,
-                 minid_email, minid_title, minid_test, globus_auth_token):
-    try:
-
-        minid = _register_minid(filename, aws_bucket_filename,
-                                minid_email, minid_title, minid_test,
-                                globus_auth_token=globus_auth_token)
-
-    except minid_client_api.MinidAPIException as minid_exc:
-        if minid_exc.type == 'UserNotRegistered':
-            minid_client_api.register_user(settings.MINID_SERVER,
-                                           minid_email,
-                                           minid_user,
-                                           '',  # ORCID is not currently used
-                                           globus_auth_token=globus_auth_token
-                                           )
-            minid = _register_minid(filename, aws_bucket_filename,
-                                    minid_email, minid_title, minid_test,
-                                    globus_auth_token=globus_auth_token)
-        else:
-            raise
     return minid
 
 
