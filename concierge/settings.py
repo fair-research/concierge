@@ -65,10 +65,11 @@ INSTALLED_APPS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
-        # We don't support auth via globus tokens yet
-        'rest_framework.permissions.AllowAny'
+        'api.auth.GlobusTokenAuthentication'
     ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'api.auth.GlobusUserAllowAny'
+    ]
 }
 
 MIDDLEWARE = [
