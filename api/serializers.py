@@ -9,7 +9,7 @@ import globus_sdk
 from api.models import Bag, StageBag
 from api.utils import (create_bag_archive, create_minid, upload_to_s3,
                        fetch_bags, catalog_transfer_manifest, transfer_catalog)
-from api.exc import ConciergeException, GlobusTransferException
+from api.exc import GlobusTransferException
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +53,8 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                              validated_data['access_token'])
 
         os.remove(bag_filename)
-        return Bag.objects.create(minid_id=minid,
+        return Bag.objects.create(user=self.context['request'].user,
+                                  minid_id=minid,
                                   minid_email=validated_data['minid_email'],
                                   location=validated_data['location'])
 

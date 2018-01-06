@@ -1,8 +1,14 @@
 from __future__ import unicode_literals
 from django.db import models
+from django.contrib.auth.models import User
+
+
+class GlobusUser(User):
+    uuid = models.UUIDField(primary_key=True, editable=False)
 
 
 class Bag(models.Model):
+    user = models.ForeignKey(GlobusUser, on_delete=models.CASCADE)
     minid_id = models.CharField(max_length=30)
     minid_email = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
@@ -14,7 +20,7 @@ class Bag(models.Model):
 
 
 class StageBag(models.Model):
-
+    user = models.ForeignKey(GlobusUser, on_delete=models.CASCADE)
     destination_endpoint = models.CharField(max_length=512)
     destination_path_prefix = models.CharField(max_length=255)
     bag_minids = models.TextField()

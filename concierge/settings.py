@@ -68,7 +68,7 @@ REST_FRAMEWORK = {
         'api.auth.GlobusTokenAuthentication'
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'api.auth.GlobusUserAllowAny'
+        # Anonymous users are welcome to the base API
     ]
 }
 
@@ -154,7 +154,7 @@ LOGGING = {
         'django.db.backends': {
                     'handlers': ['null'],  # Quiet by default!
                     'propagate': False,
-                    'level':'DEBUG',
+                    'level': 'DEBUG',
                     },
         'api': {
             'handlers': ['stream'],
