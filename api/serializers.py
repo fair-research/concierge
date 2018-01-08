@@ -9,7 +9,7 @@ import globus_sdk
 from api.models import Bag, StageBag
 from api.utils import (create_bag_archive, create_minid, upload_to_s3,
                        fetch_bags, catalog_transfer_manifest, transfer_catalog)
-from api.exc import ConciergeException, GlobusTransferException
+from api.exc import GlobusTransferException
 
 log = logging.getLogger(__name__)
 
@@ -47,10 +47,12 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                              validated_data['minid_user'],
                              validated_data['minid_email'],
                              validated_data['minid_title'],
-                             True)
+                             True,
+                             self.context['request'].auth)
 
         os.remove(bag_filename)
-        return Bag.objects.create(minid_id=minid,
+        return Bag.objects.create(user=self.context['request'].user,
+                                  minid_id=minid,
                                   minid_email=validated_data['minid_email'],
                                   location=validated_data['location'])
 
@@ -66,7 +68,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = StageBag
-        fields = '__all__'
+        exclude = ('user',)
 
     def to_representation(self, obj):
         ret_val = super(StageBagSerializer, self).to_representation(obj)
@@ -94,7 +96,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
                 validated_data['destination_path_prefix'],
                 validated_data['transfer_token']
                 )
-            stage_bag_data = {
+            stage_bag_data = {'user': self.context['request'].user,
                               'transfer_catalog': json.dumps(catalog),
                               'error_catalog': json.dumps(error_catalog),
                               'transfer_task_ids': json.dumps(task_ids),

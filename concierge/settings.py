@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '@vrnf7j9^bvtxxd&-n3taui^ghj724x@(mt15j8i!_)_y7zz0l'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = []
 
@@ -38,7 +38,6 @@ GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'
 # Minid Server
 MINID_SERVER = "https://portal.sc17.nick.globuscs.info/minid"
 MINID_TEST = False
-MINID_SERVICE_TOKEN = ''
 
 # Bag Settings
 BAG_STAGING_DIR = '/tmp/bag_staging'
@@ -66,10 +65,11 @@ INSTALLED_APPS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
-        # We don't support auth via globus tokens yet
-        'rest_framework.permissions.AllowAny'
+        'api.auth.GlobusTokenAuthentication'
     ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        # Anonymous users are welcome to the base API
+    ]
 }
 
 MIDDLEWARE = [
@@ -154,7 +154,7 @@ LOGGING = {
         'django.db.backends': {
                     'handlers': ['null'],  # Quiet by default!
                     'propagate': False,
-                    'level':'DEBUG',
+                    'level': 'DEBUG',
                     },
         'api': {
             'handlers': ['stream'],
