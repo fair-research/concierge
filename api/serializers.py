@@ -1,11 +1,17 @@
 from __future__ import unicode_literals
 import os
 import json
+import logging
+from django.conf import settings
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+import globus_sdk
 from api.models import Bag, StageBag
 from api.utils import (create_bag_archive, create_minid, upload_to_s3,
                        fetch_bags, catalog_transfer_manifest, transfer_catalog)
-from django.conf import settings
+from api.exc import ConciergeException, GlobusTransferException
+
+log = logging.getLogger(__name__)
 
 
 class BagSerializer(serializers.HyperlinkedModelSerializer):
@@ -73,26 +79,28 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             ret_val['transfer_task_ids'] = json.loads(obj.transfer_task_ids)
         return ret_val
 
-
     def to_internal_value(self, obj):
         obj['bag_minids'] = json.dumps(obj['bag_minids'])
         ret_val = super(StageBagSerializer, self).to_internal_value(obj)
         return ret_val
 
-
     def create(self, validated_data):
-        bags = Bag.objects.filter(minid_id__in=json.loads(validated_data['bag_minids']))
-        bagit_bags = fetch_bags(bags)
-        catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
-        task_ids = transfer_catalog(catalog,
-                                    validated_data['destination_endpoint'],
-                                    validated_data['destination_path_prefix'],
-                                    validated_data['transfer_token']
-                                    )
-        stage_bag_data = {
-                          'transfer_catalog': json.dumps(catalog),
-                          'error_catalog': json.dumps(error_catalog),
-                          'transfer_task_ids': json.dumps(task_ids),
-                          }
-        stage_bag_data.update(validated_data)
-        return StageBag.objects.create(**stage_bag_data)
+        try:
+            bagit_bags = fetch_bags(json.loads(validated_data['bag_minids']))
+            catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
+            task_ids = transfer_catalog(
+                catalog,
+                validated_data['destination_endpoint'],
+                validated_data['destination_path_prefix'],
+                validated_data['transfer_token']
+                )
+            stage_bag_data = {
+                              'transfer_catalog': json.dumps(catalog),
+                              'error_catalog': json.dumps(error_catalog),
+                              'transfer_task_ids': json.dumps(task_ids),
+                              }
+            stage_bag_data.update(validated_data)
+            return StageBag.objects.create(**stage_bag_data)
+        except globus_sdk.exc.TransferAPIError as te:
+            raise GlobusTransferException(detail={'error': te.message,
+                                          'code': te.code})

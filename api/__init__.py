@@ -1,6 +1,10 @@
 import os
 from django.core.checks import Error, Warning, register
 from django.conf import settings
+import logging
+
+log = logging.getLogger(__name__)
+log.debug('Debugging is active.')
 
 
 @register()

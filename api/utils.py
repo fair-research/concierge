@@ -4,14 +4,19 @@ from os.path import join
 import json
 import uuid
 import requests
-from six.moves.urllib_parse import urlsplit
-from django.conf import settings
+import logging
 import boto3
 import globus_sdk
+from six.moves.urllib_parse import urlsplit
+from django.conf import settings
 from minid_client import minid_client_api
 import bagit
 from bdbag import bdbag_api
 
+from api.models import Bag
+from api.exc import ConciergeException
+
+log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
 # increments
 HTTP_CHUNK_SIZE = 2**10
@@ -100,10 +105,25 @@ def upload_to_s3(filename, key):
         )
 
 
-def fetch_bags(bags):
-    """Given a list of bag models, follow their location and
+def _resolve_minids_to_bags(bag_minids):
+    bags = Bag.objects.filter(
+        minid_id__in=bag_minids)
+    if len(bags) != len(bag_minids):
+        bad_bags = [b for b in bag_minids
+                    if b not in [bg.minid_id for bg in bags]]
+        raise ConciergeException({
+            'error': 'Bags not created with the concierge service are not '
+                     'supported yet: {}'.format(','.join(bad_bags)),
+            'bags': bad_bags
+        })
+    return bags
+
+
+def fetch_bags(minids):
+    """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
+    bags = _resolve_minids_to_bags(minids)
     bagit_bags = []
     for bag in bags:
         bag_name = os.path.basename(bag.location)
@@ -148,33 +168,44 @@ def catalog_transfer_manifest(bagit_bags):
                 prot_errors = error_catalog.get('unsupported_protocol', [])
                 prot_errors.append(url)
                 error_catalog['unsupported_protocol'] = prot_errors
+                continue
             globus_endpoint = surl.netloc.replace(':', '')
             payload = endpoint_catalog.get(globus_endpoint, [])
             payload.append(surl.path)
             endpoint_catalog[globus_endpoint] = payload
+    if not endpoint_catalog:
+        raise ConciergeException({
+            'error': 'No valid data to transfer',
+            'error_catalog': error_catalog
+        })
     return endpoint_catalog, error_catalog
 
 
 def transfer_catalog(transfer_manifest, dest_endpoint,
-                     dest_prefix, transfer_token):
-
+                     dest_prefix, transfer_token,
+                     sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
     transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
     tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    tc.endpoint_autoactivate(dest_endpoint)
+    if not transfer_manifest:
+        raise ValidationError('No valid data to transfer',
+                              code='no_data')
     for globus_source_endpoint, data_list in transfer_manifest.items():
+        log.debug('Starting transfer from {} to {}:{} contaiting {} files'
+                  .format(globus_source_endpoint, dest_endpoint, dest_prefix,
+                          len(data_list)))
+        tc.endpoint_autoactivate(globus_source_endpoint)
         tdata = globus_sdk.TransferData(tc,
                                         globus_source_endpoint,
                                         dest_endpoint,
                                         label=settings.SERVICE_NAME,
-                                        sync_level='checksum'
+                                        sync_level=sync_level
                                         )
         for item in data_list:
-            recursive = tc.operation_ls(globus_source_endpoint, path=item) \
-                                                ['DATA_TYPE'] == 'file_list'
             tdata.add_item(
                 item,
-                '/'.join((dest_prefix, item)),
-                recursive=recursive
+                '/'.join((dest_prefix, item))
             )
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])

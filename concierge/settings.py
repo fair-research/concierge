@@ -32,6 +32,8 @@ AWS_ACCESS_KEY_ID = ""
 AWS_SECRET_ACCESS_KEY = ""
 AWS_BUCKET_NAME = "portal-sc17-nick-globuscs-info"
 
+# Globus
+GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'
 
 # Minid Server
 MINID_SERVER = "https://portal.sc17.nick.globuscs.info/minid"
@@ -133,6 +135,39 @@ AUTH_PASSWORD_VALIDATORS = [
                 'NumericPasswordValidator',
     },
 ]
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'stream': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+        },
+        'null': {
+            'level': 'DEBUG',
+            'class': 'logging.NullHandler',
+        },
+    },
+
+    'loggers': {
+        'django.db.backends': {
+                    'handlers': ['null'],  # Quiet by default!
+                    'propagate': False,
+                    'level':'DEBUG',
+                    },
+        'api': {
+            'handlers': ['stream'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'concierge': {
+            'handlers': ['stream'],
+            'level': 'DEBUG',
+            'propagate': True,
+        }
+    },
+}
 
 
 # Internationalization
