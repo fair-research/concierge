@@ -219,7 +219,7 @@ def transfer_catalog(transfer_manifest, dest_endpoint,
         raise ValidationError('No valid data to transfer',
                               code='no_data')
     for globus_source_endpoint, data_list in transfer_manifest.items():
-        log.debug('Starting transfer from {} to {}:{} contaiting {} files'
+        log.debug('Starting transfer from {} to {}:{} containing {} files'
                   .format(globus_source_endpoint, dest_endpoint, dest_prefix,
                           len(data_list)))
         tc.endpoint_autoactivate(globus_source_endpoint)

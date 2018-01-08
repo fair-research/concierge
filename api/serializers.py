@@ -68,7 +68,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = StageBag
-        fields = '__all__'
+        exclude = ('user',)
 
     def to_representation(self, obj):
         ret_val = super(StageBagSerializer, self).to_representation(obj)
@@ -96,7 +96,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
                 validated_data['destination_path_prefix'],
                 validated_data['transfer_token']
                 )
-            stage_bag_data = {
+            stage_bag_data = {'user': self.context['request'].user,
                               'transfer_catalog': json.dumps(catalog),
                               'error_catalog': json.dumps(error_catalog),
                               'transfer_task_ids': json.dumps(task_ids),

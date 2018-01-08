@@ -69,5 +69,5 @@ class GlobusTokenAuthentication(TokenAuthentication):
 
             return user, key
         except globus_sdk.exc.AuthAPIError:
-            raise AuthenticationFailed('Expired or invalid Globus Auth '
-                                       'code.')
+            raise AuthenticationFailed(detail={'detail': 'Expired or invalid Globus Auth ',
+                                       'code': 'InvalidOrExpired'})
