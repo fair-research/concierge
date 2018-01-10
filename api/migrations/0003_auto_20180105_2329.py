@@ -7,6 +7,14 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
+    """**Warning on this migration!**
+    This is a quick and dirty migration that won't properly add users to all
+    existing bags properly. Instead of assigning the correct user, it will
+    assign nick@globus.org. This is a quick hack in the interest of time since
+    we don't have a ton of very important data yet and can probably afford to
+    have people remake their bags, or if we do it can be done easily enough
+    through a manual lookup and edit.
+    """
 
     dependencies = [
         ('auth', '0009_alter_user_last_name_max_length'),
@@ -17,8 +25,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='GlobusUser',
             fields=[
-                ('user_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, to=settings.AUTH_USER_MODEL)),
-                ('uuid', models.UUIDField(editable=False, primary_key=True, serialize=False)),
+                ('user_ptr', models.OneToOneField(
+                    auto_created=True,
+                    on_delete=django.db.models.deletion.CASCADE,
+                    parent_link=True, to=settings.AUTH_USER_MODEL)),
+                ('uuid', models.UUIDField(editable=False, primary_key=True,
+                                          serialize=False)),
             ],
             options={
                 'verbose_name': 'user',
@@ -33,13 +45,19 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='bag',
             name='user',
-            field=models.ForeignKey(default='3b843349-4d4d-4ef3-916d-2a465f9740a9', on_delete=django.db.models.deletion.CASCADE, to='api.GlobusUser'),
+            field=models.ForeignKey(
+                default='3b843349-4d4d-4ef3-916d-2a465f9740a9',
+                on_delete=django.db.models.deletion.CASCADE,
+                to='api.GlobusUser'),
             preserve_default=False,
         ),
         migrations.AddField(
             model_name='stagebag',
             name='user',
-            field=models.ForeignKey(default='3b843349-4d4d-4ef3-916d-2a465f9740a9', on_delete=django.db.models.deletion.CASCADE, to='api.GlobusUser'),
+            field=models.ForeignKey(
+                default='3b843349-4d4d-4ef3-916d-2a465f9740a9',
+                on_delete=django.db.models.deletion.CASCADE,
+                to='api.GlobusUser'),
             preserve_default=False,
         ),
     ]
