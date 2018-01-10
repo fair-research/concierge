@@ -8,7 +8,8 @@ from rest_framework.exceptions import ValidationError
 import globus_sdk
 from api.models import Bag, StageBag
 from api.utils import (create_bag_archive, create_minid, upload_to_s3,
-                       fetch_bags, catalog_transfer_manifest, transfer_catalog)
+                       fetch_bags, catalog_transfer_manifest, transfer_catalog,
+                       validate_remote_files_manifest)
 from api.exc import GlobusTransferException
 
 log = logging.getLogger(__name__)
@@ -23,11 +24,32 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                                         required=True)
     remote_files_manifest = serializers.JSONField(required=True)
     location = serializers.CharField(max_length=255, read_only=True)
+    transfer_token = serializers.CharField(write_only=True, required=False)
+    verify_remote_files = serializers.BooleanField(required=False)
 
     class Meta:
         model = Bag
         fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
-                  'minid_title', 'remote_files_manifest', 'location')
+                  'minid_title', 'remote_files_manifest', 'location',
+                  'transfer_token', 'verify_remote_files')
+
+    def validate_remote_files_manifest(self, manifest):
+        for record in manifest:
+            fname, url = record.get('filename'), record.get('url')
+            if not fname or not url:
+                raise ValidationError('Error in remote file manifest, '
+                                      'bad "filename" or "URL"')
+        return manifest
+
+    def validate(self, data):
+        ver, tok = data.get('verify_remote_files'), data.get('transfer_token')
+        if ver:
+            if not tok:
+                raise ValidationError('Verify Remote files set to true, but '
+                                      'no Globus Transfer Token provided')
+            data['remote_files_manifest'] = validate_remote_files_manifest(
+                data['remote_files_manifest'], tok)
+        return data
 
     def create(self, validated_data):
         validated_manifest = validated_data['remote_files_manifest']

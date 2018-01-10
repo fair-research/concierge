@@ -22,6 +22,68 @@ log = logging.getLogger(__name__)
 HTTP_CHUNK_SIZE = 2**10
 
 
+def validate_remote_files_manifest(remote_files_manifest, transfer_token):
+    transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
+    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+
+    new_manifest = []
+    for record in remote_files_manifest:
+        surl = urlsplit(record['url'])
+        if surl.scheme not in settings.SUPPORTED_STAGING_PROTOCOLS:
+            new_manifest.append(record)
+            log.debug('Verification skipped record {} (non-globus)'.format(
+                record['name']
+            ))
+            continue
+        globus_endpoint = surl.netloc.replace(':', '')
+        tc.endpoint_autoactivate(globus_endpoint)
+        new_man = _walk_globus_path(tc, globus_endpoint, surl.path)
+        new_manifest += new_man
+
+    return new_manifest
+
+
+def _walk_globus_path(client, globus_endpoint, path):
+    """Walk the filesystem on the endpoint to find all of the files within
+    a directory. Called recursively on all dirs. Returns a list of all files
+    under the given path with the following format:
+    {
+        'filename': 'foo.txt',
+        'url': gloubs:///car/bar/foo.txt,
+        'size': 123456
+    }
+    """
+    log.debug('Walking path to validate files: '
+              '{}:{}'.format(globus_endpoint, path))
+    ls_info = client.operation_ls(globus_endpoint, path=path)
+    # Recursion base case, return if top level is file.
+    if ls_info['DATA_TYPE'] == 'file':
+        return [{
+                'url': 'globus://{}:{}'.format(globus_endpoint,
+                                               ls_info['path']),
+                'filename': join(path, ls_info['path']),
+                'size': ls_info['size']}]
+    # Loop through all files in the 'ls', capture data, and recurse again if
+    # we encounter a folder.
+    files = []
+    for file in ls_info['DATA']:
+        if file['type'] == 'file':
+            files.append({
+                'url': 'globus://{}:{}'.format(globus_endpoint,
+                                               join(path, file['name'])),
+                'filename': file['name'],
+                'size': file['size']})
+        elif file['type'] == 'dir':
+            files += _walk_globus_path(client, globus_endpoint,
+                                       join(path, file['name']))
+        else:
+            log.warning('Encountered strange file type while validating path '
+                        '"{}:{}" File data: {}'.format(globus_endpoint, path,
+                                                       file))
+            continue
+    return files
+
+
 def create_bag_archive(metadata, bag_algorithms=('md5', 'sha256'),
                        **bag_metadata):
     bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
