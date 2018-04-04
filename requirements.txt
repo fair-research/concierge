@@ -1,6 +1,7 @@
-django>=1.11.7,>=1.8
-django-rest-framework
-django-rest-swagger
-boto3>=1.4.7
-globus_sdk>=1.3.0
-git+https://github.com/globusonline/minid@develop#egg=minid
+django==1.11.12
+djangorestframework==3.8.1
+django-rest-swagger==2.1.2
+boto3>=1.7.0
+globus-sdk==1.5.0
+bdbag==1.1.2
+minid==1.2.3
