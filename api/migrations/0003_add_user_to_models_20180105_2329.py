@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ('auth', '0009_alter_user_last_name_max_length'),
+        ('auth', '0007_alter_validators_add_error_messages'),
         ('api', '0002_stagebag'),
     ]
 
