@@ -23,6 +23,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     minid_title = serializers.CharField(allow_blank=False, max_length=255,
                                         required=True)
     remote_files_manifest = serializers.JSONField(required=True)
+    metadata = serializers.JSONField(required=False)
     location = serializers.CharField(max_length=255, read_only=True)
     transfer_token = serializers.CharField(write_only=True, required=False)
     verify_remote_files = serializers.BooleanField(required=False)
@@ -30,8 +31,8 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Bag
         fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
-                  'minid_title', 'remote_files_manifest', 'location',
-                  'transfer_token', 'verify_remote_files')
+                  'minid_title', 'remote_files_manifest', 'metadata',
+                  'location', 'transfer_token', 'verify_remote_files')
 
     def validate_remote_files_manifest(self, manifest):
         for record in manifest:
@@ -54,8 +55,9 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     def create(self, validated_data):
         validated_manifest = validated_data['remote_files_manifest']
 
-        bag_metadata = {'Creator-Name': validated_data['minid_user']}
-        bag_filename = create_bag_archive(validated_manifest, **bag_metadata)
+        bag_metadata = validated_data.get('metadata') or \
+            {'bag_metadata': {'Creator-Name': validated_data['minid_user']}}
+        bag_filename = create_bag_archive(validated_manifest, bag_metadata)
 
         s3_bag_filename = os.path.basename(bag_filename)
         upload_to_s3(bag_filename, s3_bag_filename)
