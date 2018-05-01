@@ -84,7 +84,7 @@ def _walk_globus_path(client, globus_endpoint, path):
     return files
 
 
-def create_bag_archive(manifest, bag_metadata):
+def create_bag_archive(manifest, bag_metadata, ro_metadata):
     try:
         bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
         remote_manifest_filename = join(settings.BAG_STAGING_DIR,
@@ -96,6 +96,7 @@ def create_bag_archive(manifest, bag_metadata):
         os.mkdir(bag_name)
         bdbag_api.make_bag(bag_name,
                            metadata=bag_metadata,
+                           ro_metadata=ro_metadata,
                            remote_file_manifest=remote_manifest_filename,
                            )
         bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
