@@ -60,7 +60,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
         bag_metadata = validated_data.get('metadata') or \
             {'bag_metadata': {'Creator-Name': validated_data['minid_user']}}
         bag_filename = create_bag_archive(validated_manifest, bag_metadata,
-                                          validated_data['ro_metadata'])
+                                          validated_data.get('ro_metadata'))
 
         s3_bag_filename = os.path.basename(bag_filename)
         upload_to_s3(bag_filename, s3_bag_filename)
