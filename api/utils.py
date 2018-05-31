@@ -84,37 +84,28 @@ def _walk_globus_path(client, globus_endpoint, path):
     return files
 
 
-def create_bag_archive(metadata, bag_algorithms=('md5', 'sha256'),
-                       **bag_metadata):
-    bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
-    remote_manifest_filename = join(settings.BAG_STAGING_DIR,
-                                    str(uuid.uuid4()))
+def create_bag_archive(manifest, bag_metadata, ro_metadata):
+    try:
+        bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
+        remote_manifest_filename = join(settings.BAG_STAGING_DIR,
+                                        str(uuid.uuid4()))
 
-    remote_manifest_formatted = _format_remote_file_manifest(metadata,
-                                                             bag_algorithms)
-    with open(remote_manifest_filename, 'w') as f:
-        f.write(json.dumps(remote_manifest_formatted))
+        with open(remote_manifest_filename, 'w') as f:
+            f.write(json.dumps(manifest))
 
-    os.mkdir(bag_name)
-    bdbag_api.make_bag(bag_name,
-                       algs=bag_algorithms,
-                       metadata=dict(bag_metadata),
-                       remote_file_manifest=remote_manifest_filename,
-                       )
-    bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
+        os.mkdir(bag_name)
+        bdbag_api.make_bag(bag_name,
+                           metadata=bag_metadata,
+                           ro_metadata=ro_metadata,
+                           remote_file_manifest=remote_manifest_filename,
+                           )
+        bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
 
-    archive_name = '{}.{}'.format(bag_name, settings.BAG_ARCHIVE_FORMAT)
-    os.remove(remote_manifest_filename)
-    return archive_name
-
-
-def _format_remote_file_manifest(manifest, algorithms):
-    for file in manifest:
-        # If hash doesn't exist, add the empty string for each algorithm entry
-        algs = {alg: file.get(alg, '') for alg in algorithms}
-        file.update(algs)
-        file['length'] = file.get('length', 0)
-    return manifest
+        archive_name = '{}.{}'.format(bag_name, settings.BAG_ARCHIVE_FORMAT)
+        os.remove(remote_manifest_filename)
+        return archive_name
+    except Exception as e:
+        raise ConciergeException(str(e), code='bdbag_creation_error')
 
 
 def _register_minid(minid_user, minid_email, minid_title, minid_test,
