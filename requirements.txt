@@ -3,5 +3,5 @@ djangorestframework==3.8.1
 django-rest-swagger==2.1.2
 boto3>=1.7.0
 globus-sdk==1.5.0
-bdbag==1.1.2
+bdbag==1.3.0
 minid==1.2.3
