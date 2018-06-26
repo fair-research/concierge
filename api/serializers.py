@@ -74,7 +74,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                              validated_data['minid_user'],
                              validated_data['minid_email'],
                              validated_data['minid_title'],
-                             True,
+                             settings.MINID_TEST,
                              self.context['request'].auth)
 
         os.remove(bag_filename)
@@ -115,7 +115,8 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         try:
-            bagit_bags = fetch_bags(json.loads(validated_data['bag_minids']))
+            minids = json.loads(validated_data['bag_minids'])
+            bagit_bags = fetch_bags(minids, self.context['request'].user)
             catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
             task_ids = transfer_catalog(
                 catalog,

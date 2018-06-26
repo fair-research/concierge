@@ -185,25 +185,30 @@ def upload_to_s3(filename, key):
         )
 
 
-def _resolve_minids_to_bags(bag_minids):
-    bags = Bag.objects.filter(
-        minid_id__in=bag_minids)
+def _resolve_minids_to_bags(bag_minids, user):
+    bags = Bag.objects.filter(minid_id__in=bag_minids)
+    bags = list(bags)
     if len(bags) != len(bag_minids):
         bad_bags = [b for b in bag_minids
                     if b not in [bg.minid_id for bg in bags]]
-        raise ConciergeException({
-            'error': 'Bags not created with the concierge service are not '
-                     'supported yet: {}'.format(','.join(bad_bags)),
-            'bags': bad_bags
-        })
+        for minid in bad_bags:
+            ent = minid_client_api.get_entities(settings.MINID_SERVER, minid,
+                                            settings.MINID_TEST)
+            if not len(ent[minid]['locations']) > 0:
+                raise ConciergeException({'error': 'Minid has no location {}'
+                                         ''.format(minid)})
+            loc = ent[minid]['locations'][0]['link']
+            b = Bag.objects.create(user=user, minid_id=minid, location=loc)
+            b.save()
+            bags.append(b)
     return bags
 
 
-def fetch_bags(minids):
+def fetch_bags(minids, user):
     """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
-    bags = _resolve_minids_to_bags(minids)
+    bags = _resolve_minids_to_bags(minids, user)
     bagit_bags = []
     for bag in bags:
         bag_name = os.path.basename(bag.location)
