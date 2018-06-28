@@ -49,24 +49,30 @@ class GlobusTokenAuthentication(TokenAuthentication):
             info = auth_client.oauth2_userinfo()
             log.debug(info)
             email = info.get('email')
-            if not email:
+            user_uuid = info.get('sub')
+
+            if not email or not user_uuid:
                 log.error('Unable to get email for user, was "email" '
                           'included in scopes?')
                 raise AuthenticationFailed('Unable to verify user email')
-            user_info = auth_client.get_identities(usernames=[email])
-            try:
-                log.debug(user_info.data)
-                user_uuid = user_info.data['identities'][0]['id']
-            except KeyError:
-                raise AuthenticationFailed(
-                    'Failed to verify email "{}"'.format(email))
-
             user = GlobusUser.objects.filter(uuid=user_uuid).first()
             if not user:
-                user_info = auth_client.get_identities(usernames=[email])
-                log.debug('ID Info: {}'.format(user_info))
-                user = GlobusUser(email=email, uuid=user_uuid)
+                user = GlobusUser(email=email, uuid=user_uuid, username=email)
                 user.save()
+                log.debug('Created user {}, using concierge for the first time'
+                          '!'.format(user))
+            # user_info = auth_client.get_identities(usernames=[email])
+            # try:
+            #     log.debug(user_info.data)
+            #     user_uuid = user_info.data['identities'][0]['id']
+            # except KeyError:
+            #     raise AuthenticationFailed(
+            #         'Failed to verify email "{}"'.format(email))
+
+            #user = GlobusUser.objects.filter(uuid=user_uuid).first()
+            # if not user:
+                #user_info = auth_client.get_identities(usernames=[email])
+                # log.debug('ID Info: {}'.format(user_info))
             log.debug('Concierge service authenticated user: {}'.format(email))
 
             return user, key
