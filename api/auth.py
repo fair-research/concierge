@@ -54,6 +54,7 @@ class GlobusTokenAuthentication(TokenAuthentication):
                 raise AuthenticationFailed('Unable to verify user email')
             user_info = auth_client.get_identities(usernames=[email])
             try:
+                log.debug(user_info.data)
                 user_uuid = user_info.data['identities'][0]['id']
             except KeyError:
                 raise AuthenticationFailed(
