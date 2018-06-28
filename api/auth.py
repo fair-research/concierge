@@ -47,6 +47,7 @@ class GlobusTokenAuthentication(TokenAuthentication):
         try:
 
             info = auth_client.oauth2_userinfo()
+            log.debug(info)
             email = info.get('email')
             if not email:
                 log.error('Unable to get email for user, was "email" '
