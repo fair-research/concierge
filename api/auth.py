@@ -5,7 +5,8 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import permissions
 import globus_sdk
 
-from api.models import GlobusUser
+# from api.models import GlobusUser
+from django.contrib.auth.models import User
 
 log = logging.getLogger(__name__)
 
@@ -48,16 +49,16 @@ class GlobusTokenAuthentication(TokenAuthentication):
 
             info = auth_client.oauth2_userinfo()
             log.debug(info)
+            pu = info.get('preferred_username')
             email = info.get('email')
-            user_uuid = info.get('sub')
 
-            if not email or not user_uuid:
+            if not pu or not email:
                 log.error('Unable to get email for user, was "email" '
                           'included in scopes?')
                 raise AuthenticationFailed('Unable to verify user email')
-            user = GlobusUser.objects.filter(uuid=user_uuid).first()
+            user = User.objects.filter(username=pu).first()
             if not user:
-                user = GlobusUser(email=email, uuid=user_uuid, username=email)
+                user = User(email=pu, username=pu)
                 user.save()
                 log.debug('Created user {}, using concierge for the first time'
                           '!'.format(user))
