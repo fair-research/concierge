@@ -158,7 +158,7 @@ LOGGING = {
                     },
         'api': {
             'handlers': ['stream'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propagate': True,
         },
         'concierge': {

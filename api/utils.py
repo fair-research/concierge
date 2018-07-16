@@ -111,6 +111,13 @@ def create_bag_archive(manifest, bag_metadata, ro_metadata):
 def _register_minid(minid_user, minid_email, minid_title, minid_test,
                     globus_auth_token, checksum, locations):
     try:
+        # def register_entity(server, checksum, email, code,
+        #                     url=None, title='', test=False, content_key=None,
+        #                     globus_auth_token=None, checksum_function=None):
+        log.debug("user: {}, email: {}, title: {}, "
+                  "minid_test: {}, token: _REDACTED_, checksum: {}, locations: {}".format(
+                  minid_user, minid_email, minid_title,
+                  minid_test, checksum, locations))
         minid = minid_client_api.register_entity(
             settings.MINID_SERVER,
             checksum,
