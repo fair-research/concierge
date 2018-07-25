@@ -48,9 +48,14 @@ SUPPORTED_STAGING_PROTOCOLS = ['globus']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
 
+#GLOBUS_KEY = '4752a5da-450f-4a9b-bc60-66be6ce7258a'
+GLOBUS_KEY = '524361f2-e4a9-4bd0-a3a6-03e365cac8a9'
+GLOBUS_SECRET = 'mkiU14Wzla8TVW447hO7SA5ah2/PYlRFbD7k9GRsCoI='
+
+# Id for creating minids
+IDENTIFIER_NAMESPACE = 'HHxPIZaVDh9u'
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

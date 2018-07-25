@@ -1,12 +1,14 @@
 from __future__ import unicode_literals
 import logging
+from django.conf import settings
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import permissions
 import globus_sdk
 
-# from api.models import GlobusUser
+#from api.models import GlobusUser
 from django.contrib.auth.models import User
+from api.models import TokenStore
 
 log = logging.getLogger(__name__)
 
@@ -43,39 +45,26 @@ class GlobusTokenAuthentication(TokenAuthentication):
     keyword = 'Bearer'
 
     def authenticate_credentials(self, key):
-        auth_client = globus_sdk.AuthClient(
-            authorizer=globus_sdk.AccessTokenAuthorizer(key))
+        ac = globus_sdk.ConfidentialAppAuthClient(settings.GLOBUS_KEY,
+                                                  settings.GLOBUS_SECRET)
         try:
-
-            info = auth_client.oauth2_userinfo()
+            info = ac.oauth2_token_introspect(key).data
             log.debug(info)
-            pu = info.get('preferred_username')
-            email = info.get('email')
-
-            if not pu or not email:
-                log.error('Unable to get email for user, was "email" '
-                          'included in scopes?')
-                raise AuthenticationFailed('Unable to verify user email')
+            pu = info.get('username')
+            log.debug('logging in user: {}'.format(pu))
             user = User.objects.filter(username=pu).first()
             if not user:
-                user = User(email=pu, username=pu)
+                user = User(username=pu, email=info.get('email'))
                 user.save()
                 log.debug('Created user {}, using concierge for the first time'
                           '!'.format(user))
-            # user_info = auth_client.get_identities(usernames=[email])
-            # try:
-            #     log.debug(user_info.data)
-            #     user_uuid = user_info.data['identities'][0]['id']
-            # except KeyError:
-            #     raise AuthenticationFailed(
-            #         'Failed to verify email "{}"'.format(email))
-
-            #user = GlobusUser.objects.filter(uuid=user_uuid).first()
-            # if not user:
-                #user_info = auth_client.get_identities(usernames=[email])
-                # log.debug('ID Info: {}'.format(user_info))
-            log.debug('Concierge service authenticated user: {}'.format(email))
-
+            ts = TokenStore.objects.filter(user=user).first()
+            if not ts:
+                ts = TokenStore(user=user)
+            ts.tokens = ac.oauth2_get_dependent_tokens(key).data
+            ts.save()
+            log.debug('Concierge service authenticated user: {}, ({})'
+                      ''.format(user.username, user.email))
             return user, key
         except globus_sdk.exc.AuthAPIError:
             raise AuthenticationFailed(detail={

@@ -7,9 +7,10 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 import globus_sdk
 from api.models import Bag, StageBag
-from api.utils import (create_bag_archive, create_minid, upload_to_s3,
+from api.utils import (create_bag_archive, upload_to_s3,
                        fetch_bags, catalog_transfer_manifest, transfer_catalog,
                        validate_remote_files_manifest)
+from api.minid import create_minid
 from api.exc import GlobusTransferException
 
 log = logging.getLogger(__name__)
@@ -71,15 +72,12 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
         minid = create_minid(bag_filename,
                              s3_bag_filename,
-                             validated_data['minid_user'],
-                             validated_data['minid_email'],
                              validated_data['minid_title'],
-                             settings.MINID_TEST,
-                             self.context['request'].auth)
+                             self.context['request'].user)
 
         os.remove(bag_filename)
         return Bag.objects.create(user=self.context['request'].user,
-                                  minid_id=minid,
+                                  minid_id=minid['identifier'],
                                   minid_email=validated_data['minid_email'],
                                   location=validated_data['location'])
 
