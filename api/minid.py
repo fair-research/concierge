@@ -10,6 +10,13 @@ from api.models import TokenStore
 log = logging.getLogger(__name__)
 
 
+def load_identifier_client(token=None):
+    ac = globus_sdk.AccessTokenAuthorizer(token) if token else None
+    return IdentifierClient('Identifier',
+                            base_url='https://identifiers.globus.org/',
+                            app_name='Concierge Service',
+                            authorizer=ac)
+
 def create_minid(filename, aws_bucket_filename, minid_title, user):
     checksum = minid_client_api.compute_checksum(filename)
     locations = ["https://s3.amazonaws.com/%s/%s" % (
@@ -17,10 +24,7 @@ def create_minid(filename, aws_bucket_filename, minid_title, user):
                              aws_bucket_filename)]
     log.debug('Computed Minid Checksum.')
     token = TokenStore.get_id_token(user)
-    ic = IdentifierClient('Identifier',
-                          base_url='https://identifiers.globus.org/',
-                          app_name='Concierge Service',
-                          authorizer=globus_sdk.AccessTokenAuthorizer(token))
+    ic = load_identifier_client(token)
     log.debug('checksub: {}'.format(checksum))
     kwargs = {
           'namespace': settings.IDENTIFIER_NAMESPACE,

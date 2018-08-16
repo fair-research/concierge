@@ -9,12 +9,14 @@ import boto3
 import globus_sdk
 from six.moves.urllib_parse import urlsplit
 from django.conf import settings
-from minid_client import minid_client_api
 import bagit
 from bdbag import bdbag_api
+from identifier_client.identifier_api import IdentifierClientError
 
-from api.models import Bag
+from api.models import Bag, TokenStore
 from api.exc import ConciergeException, ServiceAuthException
+from api.minid import load_identifier_client
+from api.auth import load_globus_access_token
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
@@ -126,15 +128,19 @@ def _resolve_minids_to_bags(bag_minids, user):
         bad_bags = [b for b in bag_minids
                     if b not in [bg.minid_id for bg in bags]]
         for minid in bad_bags:
-            ent = minid_client_api.get_entities(settings.MINID_SERVER, minid,
-                                            settings.MINID_TEST)
-            if not len(ent[minid]['locations']) > 0:
-                raise ConciergeException({'error': 'Minid has no location {}'
-                                         ''.format(minid)})
-            loc = ent[minid]['locations'][0]['link']
-            b = Bag.objects.create(user=user, minid_id=minid, location=loc)
-            b.save()
-            bags.append(b)
+            try:
+                ic = load_identifier_client()
+                minid = ic.get_identifier(minid).data
+                if not minid['location']:
+                    raise ConciergeException({'error': 'Minid has no location '
+                                             '{}'.format(minid)})
+                loc = minid['location'][0]
+                b = Bag.objects.create(user=user, minid_id=minid, location=loc)
+                b.save()
+                bags.append(b)
+            except IdentifierClientError as ice:
+                log.exception(ice)
+                log.error('User {} unable to resolve minid data.'.format(user))
     return bags
 
 
@@ -200,10 +206,14 @@ def catalog_transfer_manifest(bagit_bags):
     return endpoint_catalog, error_catalog
 
 
-def transfer_catalog(transfer_manifest, dest_endpoint,
-                     dest_prefix, transfer_token,
+def get_transfer_token(user):
+    return TokenStore.get_transfer_token(user) or \
+           load_globus_access_token(user, 'transfer.api.globus.org')
+
+def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
+    transfer_token = get_transfer_token(user)
     transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
     tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
     tc.endpoint_autoactivate(dest_endpoint)

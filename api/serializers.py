@@ -27,15 +27,13 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     metadata = serializers.JSONField(required=False)
     ro_metadata = serializers.JSONField(required=False)
     location = serializers.CharField(max_length=255, read_only=True)
-    transfer_token = serializers.CharField(write_only=True, required=False)
     verify_remote_files = serializers.BooleanField(required=False)
 
     class Meta:
         model = Bag
         fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
                   'minid_title', 'remote_files_manifest', 'metadata',
-                  'ro_metadata', 'location', 'transfer_token',
-                  'verify_remote_files')
+                  'ro_metadata', 'location', 'verify_remote_files')
 
     def validate_remote_files_manifest(self, manifest):
         for record in manifest:
@@ -86,7 +84,6 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     id = serializers.IntegerField(read_only=True)
     bag_minids = serializers.JSONField(required=True)
-    transfer_token = serializers.CharField(write_only=True, required=True)
     transfer_catalog = serializers.JSONField(read_only=True)
     error_catalog = serializers.JSONField(read_only=True)
     transfer_task_ids = serializers.JSONField(read_only=True)
@@ -117,10 +114,10 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             bagit_bags = fetch_bags(minids, self.context['request'].user)
             catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
             task_ids = transfer_catalog(
+                self.context['request'].user,
                 catalog,
                 validated_data['destination_endpoint'],
-                validated_data['destination_path_prefix'],
-                validated_data['transfer_token']
+                validated_data['destination_path_prefix']
                 )
             stage_bag_data = {'user': self.context['request'].user,
                               'transfer_catalog': json.dumps(catalog),

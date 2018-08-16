@@ -1,10 +1,13 @@
 from __future__ import unicode_literals
 import logging
+from datetime import timedelta
+from django.utils import timezone
 from django.conf import settings
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import permissions
 import globus_sdk
+
 
 #from api.models import GlobusUser
 from django.contrib.auth.models import User
@@ -51,6 +54,8 @@ class GlobusTokenAuthentication(TokenAuthentication):
             info = ac.oauth2_token_introspect(key).data
             log.debug(info)
             pu = info.get('username')
+            if not pu:
+                token_expired()
             log.debug('logging in user: {}'.format(pu))
             user = User.objects.filter(username=pu).first()
             if not user:
@@ -67,6 +72,36 @@ class GlobusTokenAuthentication(TokenAuthentication):
                       ''.format(user.username, user.email))
             return user, key
         except globus_sdk.exc.AuthAPIError:
-            raise AuthenticationFailed(detail={
-                   'detail': 'Expired or invalid Globus Auth',
-                   'code': 'InvalidOrExpired'})
+            self.token_expired()
+
+
+def token_expired():
+    raise AuthenticationFailed(detail={
+           'detail': 'Expired or invalid Globus Auth',
+           'code': 'InvalidOrExpired'})
+
+
+def load_globus_access_token(user, token_name):
+    """Load a globus token from a user object. This only works if a user has
+    logged in via OAUTH directly through the Django interface."""
+    if not user:
+        return None
+    if user.is_authenticated:
+        tok_list = user.social_auth.get(provider='globus').extra_data
+        if token_name == 'auth.globus.org':
+            return tok_list['access_token']
+        if tok_list.get('other_tokens'):
+            service_tokens = {t['resource_server']: t
+                              for t in tok_list['other_tokens']}
+            service_token = service_tokens.get(token_name)
+            if service_token:
+                exp_td = timedelta(seconds=service_token['expires_in'])
+                if user.last_login + exp_td < timezone.now():
+                    raise token_expired()
+                return service_token['access_token']
+            else:
+                raise ValueError(
+                    'Attempted to load {} for user {}, but no '
+                    'tokens existed with the name {}, only {}'
+                    ''.format(token_name, user, token_name,
+                              list(service_tokens.keys())))
