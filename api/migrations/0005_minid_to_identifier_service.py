@@ -22,10 +22,6 @@ class Migration(migrations.Migration):
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
         ),
-        migrations.RemoveField(
-            model_name='globususer',
-            name='user_ptr',
-        ),
         migrations.DeleteModel(
             name='GlobusUser',
         ),
