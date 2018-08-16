@@ -29,4 +29,20 @@ class Migration(migrations.Migration):
         migrations.DeleteModel(
             name='GlobusUser',
         ),
+        migrations.RemoveField(
+            model_name='stagebag',
+            name='transfer_token',
+        ),
+        migrations.AddField(
+            model_name='stagebag',
+            name='task_catalog',
+            field=models.TextField(default={}),
+            preserve_default=False,
+        ),
+        migrations.AddField(
+            model_name='stagebag',
+            name='files_transferred',
+            field=models.IntegerField(default=0, blank=True, null=True),
+            preserve_default=False,
+        ),
     ]

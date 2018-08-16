@@ -87,6 +87,9 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
     transfer_catalog = serializers.JSONField(read_only=True)
     error_catalog = serializers.JSONField(read_only=True)
     transfer_task_ids = serializers.JSONField(read_only=True)
+    task_catalog = serializers.JSONField(read_only=True)
+    files_transferred = serializers.JSONField(read_only=True)
+    status = serializers.CharField(read_only=True)
 
     class Meta:
         model = StageBag
@@ -101,6 +104,9 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             ret_val['error_catalog'] = json.loads(obj.error_catalog)
         if ret_val.get('transfer_task_ids'):
             ret_val['transfer_task_ids'] = json.loads(obj.transfer_task_ids)
+        if ret_val.get('task_catalog'):
+            log.debug(obj.task_catalog)
+            ret_val['task_catalog'] = json.loads(obj.task_catalog)
         return ret_val
 
     def to_internal_value(self, obj):

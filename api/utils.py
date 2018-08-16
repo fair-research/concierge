@@ -13,10 +13,10 @@ import bagit
 from bdbag import bdbag_api
 from identifier_client.identifier_api import IdentifierClientError
 
-from api.models import Bag, TokenStore
-from api.exc import ConciergeException, ServiceAuthException
+from api.models import Bag
+from api.exc import ConciergeException
 from api.minid import load_identifier_client
-from api.auth import load_globus_access_token
+from api.auth import get_transfer_token
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
@@ -206,10 +206,6 @@ def catalog_transfer_manifest(bagit_bags):
     return endpoint_catalog, error_catalog
 
 
-def get_transfer_token(user):
-    return TokenStore.get_transfer_token(user) or \
-           load_globus_access_token(user, 'transfer.api.globus.org')
-
 def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
@@ -218,8 +214,8 @@ def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
     tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:
-        raise ValidationError('No valid data to transfer',
-                              code='no_data')
+        raise ConciergeException('No valid data to transfer',
+                                 code='no_data')
     for globus_source_endpoint, data_list in transfer_manifest.items():
         log.debug('Starting transfer from {} to {}:{} containing {} files'
                   .format(globus_source_endpoint, dest_endpoint, dest_prefix,

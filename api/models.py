@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 import logging
 import json
+from functools import reduce
+from globus_sdk import AccessTokenAuthorizer, TransferClient
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -11,8 +13,6 @@ class TokenStore(models.Model):
 
     ID_SCOPE = ('https://auth.globus.org/scopes/identifiers.globus.org/'
                 'create_update')
-
-
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     token_store = models.TextField(blank=True)
@@ -61,5 +61,32 @@ class StageBag(models.Model):
     destination_path_prefix = models.CharField(max_length=255)
     bag_minids = models.TextField()
     transfer_catalog = models.TextField()
+    task_catalog = models.TextField()
+    files_transferred = models.IntegerField(blank=True, null=True)
+    status = models.CharField()
     error_catalog = models.TextField()
     transfer_task_ids = models.TextField()
+
+    @property
+    def status(self):
+        token = TokenStore.get_transfer_token(self.user)
+        tc = TransferClient(authorizer=AccessTokenAuthorizer(token))
+        old = json.loads(self.task_catalog or '{}')
+        tasks = {t: tc.get_task(t).data
+                 for t in json.loads(self.transfer_task_ids)
+                 if not old.get(t) or old[t]['status'] == 'ACTIVE'}
+        old.update(tasks)
+        tasks = old
+
+        transferred = [t['files_transferred'] for t in tasks.values()]
+        log.debug(transferred)
+        self.files_transferred = reduce(lambda x, y: x + y, transferred)
+        log.debug(self.files_transferred)
+        self.task_catalog = json.dumps(tasks)
+        self.save()
+        statuses = [s['status'] for s in tasks.values()]
+        if any(filter(lambda stat: stat in ['INACTIVE', 'FAILED'], statuses)):
+            return 'FAILED'
+        if any(filter(lambda stat: stat == 'ACTIVE', statuses)):
+            return 'ACTIVE'
+        return 'SUCCEEDED'

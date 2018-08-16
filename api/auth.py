@@ -9,9 +9,10 @@ from rest_framework import permissions
 import globus_sdk
 
 
-#from api.models import GlobusUser
+# from api.models import TokenStore
 from django.contrib.auth.models import User
-from api.models import TokenStore
+import api
+
 
 log = logging.getLogger(__name__)
 
@@ -63,9 +64,9 @@ class GlobusTokenAuthentication(TokenAuthentication):
                 user.save()
                 log.debug('Created user {}, using concierge for the first time'
                           '!'.format(user))
-            ts = TokenStore.objects.filter(user=user).first()
+            ts = api.models.TokenStore.objects.filter(user=user).first()
             if not ts:
-                ts = TokenStore(user=user)
+                ts = api.models.TokenStore(user=user)
             ts.tokens = ac.oauth2_get_dependent_tokens(key).data
             ts.save()
             log.debug('Concierge service authenticated user: {}, ({})'
@@ -79,6 +80,11 @@ def token_expired():
     raise AuthenticationFailed(detail={
            'detail': 'Expired or invalid Globus Auth',
            'code': 'InvalidOrExpired'})
+
+
+def get_transfer_token(user):
+    return api.models.TokenStore.get_transfer_token(user) or \
+           load_globus_access_token(user, 'transfer.api.globus.org')
 
 
 def load_globus_access_token(user, token_name):
