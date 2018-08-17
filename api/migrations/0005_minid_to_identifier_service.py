@@ -22,6 +22,15 @@ class Migration(migrations.Migration):
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
         ),
+        migrations.RemoveField(
+            model_name='bag',
+            name='minid_email',
+        ),
+        migrations.RenameField(
+            model_name='bag',
+            old_name='minid_id',
+            new_name='minid',
+        ),
         migrations.DeleteModel(
             name='GlobusUser',
         ),
@@ -41,4 +50,9 @@ class Migration(migrations.Migration):
             field=models.IntegerField(default=0, blank=True, null=True),
             preserve_default=False,
         ),
+        migrations.RenameField(
+            model_name='stagebag',
+            old_name='bag_minids',
+            new_name='minids',
+        )
     ]

@@ -11,8 +11,7 @@ log = logging.getLogger(__name__)
 
 class TokenStore(models.Model):
 
-    ID_SCOPE = ('https://auth.globus.org/scopes/identifiers.globus.org/'
-                'create_update')
+    ID_SCOPE = 'identifiers.globus.org'
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     token_store = models.TextField(blank=True)
@@ -27,16 +26,14 @@ class TokenStore(models.Model):
 
     @staticmethod
     def get_token(user, token_name):
-        ts = TokenStore.objects.get(user=user)
-        tokens = {t['resource_server']: t for t in ts.tokens}
-        token = tokens.get(token_name)
+        token = TokenStore.objects.get(user=user).tokens.get(token_name)
         log.debug('{} token for {} exists: {}'.format(token_name, user,
                                                       bool(token)))
         return token['access_token'] if token else None
 
     @staticmethod
     def get_id_token(user):
-        return TokenStore.get_token(user, TokenStore.ID_SCOPE)
+        return TokenStore.get_token(user, 'identifiers.globus.org')
 
     @staticmethod
     def get_transfer_token(user):
@@ -45,21 +42,16 @@ class TokenStore(models.Model):
 
 class Bag(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    minid_id = models.CharField(max_length=30)
-    minid_email = models.CharField(max_length=255)
+    minid = models.CharField(max_length=30)
     location = models.CharField(max_length=255)
 
-    minid_user = ''
-    minid_title = ''
-    minid_test = False
-    remote_files_manifest = {}
 
 
 class StageBag(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     destination_endpoint = models.CharField(max_length=512)
-    destination_path_prefix = models.CharField(max_length=255)
-    bag_minids = models.TextField()
+    destination_path_prefix = models.CharField(max_length=255, blank=True)
+    minids = models.TextField()
     transfer_catalog = models.TextField()
     task_catalog = models.TextField()
     files_transferred = models.IntegerField(blank=True, null=True)

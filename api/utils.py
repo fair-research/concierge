@@ -23,13 +23,17 @@ log = logging.getLogger(__name__)
 # increments
 HTTP_CHUNK_SIZE = 2**10
 
-
-def validate_remote_files_manifest(remote_files_manifest, transfer_token):
+def load_transfer_client(user):
+    transfer_token = get_transfer_token(user)
     transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
-    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    return globus_sdk.TransferClient(authorizer=transfer_authorizer)
+
+
+def verify_remote_file_manifest(user, remote_file_manifest):
+    tc = load_transfer_client(user)
 
     new_manifest = []
-    for record in remote_files_manifest:
+    for record in remote_file_manifest:
         surl = urlsplit(record['url'])
         if surl.scheme not in settings.SUPPORTED_STAGING_PROTOCOLS:
             new_manifest.append(record)
@@ -121,21 +125,21 @@ def upload_to_s3(filename, key):
         )
 
 
-def _resolve_minids_to_bags(bag_minids, user):
-    bags = Bag.objects.filter(minid_id__in=bag_minids)
+def _resolve_minids_to_bags(user, minids):
+    bags = Bag.objects.filter(minid__in=minids)
     bags = list(bags)
-    if len(bags) != len(bag_minids):
-        bad_bags = [b for b in bag_minids
-                    if b not in [bg.minid_id for bg in bags]]
+    if len(bags) != len(minids):
+        bad_bags = [b for b in minids
+                    if b not in [bg.minid for bg in bags]]
         for minid in bad_bags:
             try:
-                ic = load_identifier_client()
+                ic = load_identifier_client(user)
                 minid = ic.get_identifier(minid).data
                 if not minid['location']:
                     raise ConciergeException({'error': 'Minid has no location '
                                              '{}'.format(minid)})
                 loc = minid['location'][0]
-                b = Bag.objects.create(user=user, minid_id=minid, location=loc)
+                b = Bag.objects.create(user=user, minid=minid, location=loc)
                 b.save()
                 bags.append(b)
             except IdentifierClientError as ice:
@@ -144,11 +148,11 @@ def _resolve_minids_to_bags(bag_minids, user):
     return bags
 
 
-def fetch_bags(minids, user):
+def fetch_bags(user, minids):
     """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
-    bags = _resolve_minids_to_bags(minids, user)
+    bags = _resolve_minids_to_bags(user, minids)
     bagit_bags = []
     for bag in bags:
         bag_name = os.path.basename(bag.location)
@@ -209,16 +213,15 @@ def catalog_transfer_manifest(bagit_bags):
 def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
-    transfer_token = get_transfer_token(user)
-    transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
-    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    tc = load_transfer_client(user)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:
         raise ConciergeException('No valid data to transfer',
                                  code='no_data')
     for globus_source_endpoint, data_list in transfer_manifest.items():
-        log.debug('Starting transfer from {} to {}:{} containing {} files'
-                  .format(globus_source_endpoint, dest_endpoint, dest_prefix,
+        log.debug('{} starting transfer from {} to {}:{} containing {} files'
+                  .format(user, globus_source_endpoint, dest_endpoint,
+                          dest_prefix,
                           len(data_list)))
         tc.endpoint_autoactivate(globus_source_endpoint)
         tdata = globus_sdk.TransferData(tc,

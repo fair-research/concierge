@@ -10,33 +10,36 @@ from api.models import TokenStore
 log = logging.getLogger(__name__)
 
 
-def load_identifier_client(token=None):
+def load_identifier_client(user):
+    token = TokenStore.get_id_token(user)
+    log.debug('Identifier user {}, has token: {}' .format(user, bool(token)))
     ac = globus_sdk.AccessTokenAuthorizer(token) if token else None
     return IdentifierClient('Identifier',
                             base_url='https://identifiers.globus.org/',
                             app_name='Concierge Service',
                             authorizer=ac)
 
-def create_minid(filename, aws_bucket_filename, minid_title, user):
+def create_minid(user, filename, aws_bucket_filename, metadata={},
+                 visible_to=('public',), test=True):
     checksum = minid_client_api.compute_checksum(filename)
     locations = ["https://s3.amazonaws.com/%s/%s" % (
                              settings.AWS_BUCKET_NAME,
                              aws_bucket_filename)]
-    log.debug('Computed Minid Checksum.')
-    token = TokenStore.get_id_token(user)
-    ic = load_identifier_client(token)
-    log.debug('checksub: {}'.format(checksum))
+    ic = load_identifier_client(user)
+    log.debug('checksum: {}'.format(checksum))
+    namespace = (settings.TEST_IDENTIFIER_NAMESPACE
+                 if test else settings.IDENTIFIER_NAMESPACE)
+    log.debug('Test is {}, using namespace {}'.format(test, namespace))
+
     kwargs = {
-          'namespace': settings.IDENTIFIER_NAMESPACE,
-          'visible_to': json.dumps(['public']),
+          'namespace': namespace,
+          'visible_to': json.dumps(visible_to),
           'location': json.dumps(locations),
           'checksums': json.dumps([{
               'function': 'sha256',
               'value': checksum
           }]),
-          'metadata': json.dumps({
-              'Title': minid_title
-          })
+          'metadata': json.dumps(metadata)
               }
     minid = ic.create_identifier(**kwargs)
     log.debug('Created new minid for user {}: {}'.format(user.username, minid))

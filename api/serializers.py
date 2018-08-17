@@ -9,7 +9,7 @@ import globus_sdk
 from api.models import Bag, StageBag
 from api.utils import (create_bag_archive, upload_to_s3,
                        fetch_bags, catalog_transfer_manifest, transfer_catalog,
-                       validate_remote_files_manifest)
+                       verify_remote_file_manifest)
 from api.minid import create_minid
 from api.exc import GlobusTransferException
 
@@ -18,12 +18,13 @@ log = logging.getLogger(__name__)
 
 class BagSerializer(serializers.HyperlinkedModelSerializer):
 
-    minid_id = serializers.CharField(max_length=255, read_only=True)
-    minid_user = serializers.CharField(allow_blank=False, max_length=255,
-                                       required=True)
-    minid_title = serializers.CharField(allow_blank=False, max_length=255,
-                                        required=True)
-    remote_files_manifest = serializers.JSONField(required=True)
+    minid = serializers.CharField(max_length=255, read_only=True)
+    remote_file_manifest = serializers.JSONField(required=True,
+                                                 write_only=True)
+    minid_metadata = serializers.JSONField(required=False, write_only=True)
+    minid_test = serializers.BooleanField(required=False,
+                                          default=settings.DEFAULT_TEST_MINIDS)
+    visible_to = serializers.JSONField(required=False, write_only=True)
     metadata = serializers.JSONField(required=False)
     ro_metadata = serializers.JSONField(required=False)
     location = serializers.CharField(max_length=255, read_only=True)
@@ -31,59 +32,58 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Bag
-        fields = ('id', 'url', 'minid_id', 'minid_user', 'minid_email',
-                  'minid_title', 'remote_files_manifest', 'metadata',
+        fields = ('id', 'url', 'minid', 'remote_file_manifest',
+                  'minid_metadata', 'minid_test', 'visible_to', 'metadata',
                   'ro_metadata', 'location', 'verify_remote_files')
 
-    def validate_remote_files_manifest(self, manifest):
+    def validate_remote_file_manifest(self, manifest):
         for record in manifest:
             fname, url = record.get('filename'), record.get('url')
             if not fname or not url:
                 raise ValidationError('Error in remote file manifest, '
                                       'bad "filename" or "URL"')
+        log.debug('Remote File Manifest field check: PASSED.')
         return manifest
 
     def validate(self, data):
-        ver, tok = data.get('verify_remote_files'), data.get('transfer_token')
-        if ver:
-            if not tok:
-                raise ValidationError('Verify Remote files set to true, but '
-                                      'no Globus Transfer Token provided')
-            data['remote_files_manifest'] = validate_remote_files_manifest(
-                data['remote_files_manifest'], tok)
+        if data.get('verify_remote_files'):
+            data['remote_files_manifest'] = verify_remote_file_manifest(
+                self.context['request'].user,
+                data['remote_files_manifest']
+            )
         return data
 
     def create(self, validated_data):
-        validated_manifest = validated_data['remote_files_manifest']
+        validated_manifest = validated_data['remote_file_manifest']
 
-        bag_metadata = validated_data.get('metadata') or \
-            {'bag_metadata': {'Creator-Name': validated_data['minid_user']}}
+        bag_metadata = validated_data.get('metadata')
         bag_filename = create_bag_archive(validated_manifest, bag_metadata,
                                           validated_data.get('ro_metadata'))
 
         s3_bag_filename = os.path.basename(bag_filename)
         upload_to_s3(bag_filename, s3_bag_filename)
 
-        validated_data['location'] = "https://s3.amazonaws.com/%s/%s" % \
-                                     (settings.AWS_BUCKET_NAME,
-                                      s3_bag_filename)
+        loc = ('https://s3.amazonaws.com/{}/{}'.format(
+               settings.AWS_BUCKET_NAME, s3_bag_filename)
+              )
+        user = self.context['request'].user
 
-        minid = create_minid(bag_filename,
-                             s3_bag_filename,
-                             validated_data['minid_title'],
-                             self.context['request'].user)
-
+        validated_data['location'] = loc
+        metad, visible_to, test = (validated_data.get('minid_metadata'),
+                                   validated_data.get('visible_to') or
+                                                      ('public',),
+                                   validated_data.get('minid_test'))
+        minid = create_minid(user, bag_filename, s3_bag_filename, metad,
+                             visible_to, test)
         os.remove(bag_filename)
-        return Bag.objects.create(user=self.context['request'].user,
-                                  minid_id=minid['identifier'],
-                                  minid_email=validated_data['minid_email'],
-                                  location=validated_data['location'])
+        return Bag.objects.create(user=user, minid=minid['identifier'],
+                                  location=loc)
 
 
 class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     id = serializers.IntegerField(read_only=True)
-    bag_minids = serializers.JSONField(required=True)
+    minids = serializers.JSONField(required=True)
     transfer_catalog = serializers.JSONField(read_only=True)
     error_catalog = serializers.JSONField(read_only=True)
     transfer_task_ids = serializers.JSONField(read_only=True)
@@ -97,7 +97,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     def to_representation(self, obj):
         ret_val = super(StageBagSerializer, self).to_representation(obj)
-        ret_val['bag_minids'] = json.loads(obj.bag_minids)
+        ret_val['minids'] = json.loads(obj.minids)
         if ret_val.get('transfer_catalog'):
             ret_val['transfer_catalog'] = json.loads(obj.transfer_catalog)
         if ret_val.get('error_catalog'):
@@ -110,14 +110,14 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
         return ret_val
 
     def to_internal_value(self, obj):
-        obj['bag_minids'] = json.dumps(obj['bag_minids'])
+        obj['minids'] = json.dumps(obj['minids'])
         ret_val = super(StageBagSerializer, self).to_internal_value(obj)
         return ret_val
 
     def create(self, validated_data):
         try:
-            minids = json.loads(validated_data['bag_minids'])
-            bagit_bags = fetch_bags(minids, self.context['request'].user)
+            minids = json.loads(validated_data['minids'])
+            bagit_bags = fetch_bags(self.context['request'].user, minids)
             catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
             task_ids = transfer_catalog(
                 self.context['request'].user,

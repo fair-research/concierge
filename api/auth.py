@@ -53,11 +53,9 @@ class GlobusTokenAuthentication(TokenAuthentication):
                                                   settings.GLOBUS_SECRET)
         try:
             info = ac.oauth2_token_introspect(key).data
-            log.debug(info)
             pu = info.get('username')
             if not pu:
                 token_expired()
-            log.debug('logging in user: {}'.format(pu))
             user = User.objects.filter(username=pu).first()
             if not user:
                 user = User(username=pu, email=info.get('email'))
@@ -67,7 +65,8 @@ class GlobusTokenAuthentication(TokenAuthentication):
             ts = api.models.TokenStore.objects.filter(user=user).first()
             if not ts:
                 ts = api.models.TokenStore(user=user)
-            ts.tokens = ac.oauth2_get_dependent_tokens(key).data
+            ts.tokens = {t['resource_server']: t
+                         for t in ac.oauth2_get_dependent_tokens(key).data}
             ts.save()
             log.debug('Concierge service authenticated user: {}, ({})'
                       ''.format(user.username, user.email))
