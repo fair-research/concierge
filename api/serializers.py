@@ -43,6 +43,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
         if re.search(r'[^\w_\-\.]', bag_name):
             raise ValidationError('Only [-_.] special characters allowed in '
                                   'filename.')
+        return bag_name
 
 
     def validate_remote_file_manifest(self, manifest):
