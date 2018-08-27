@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+import datetime
 import os
 from os.path import join
 import json
@@ -38,7 +39,7 @@ def verify_remote_file_manifest(user, remote_file_manifest):
         if surl.scheme not in settings.SUPPORTED_STAGING_PROTOCOLS:
             new_manifest.append(record)
             log.debug('Verification skipped record {} (non-globus)'.format(
-                record['name']
+                record['filename']
             ))
             continue
         globus_endpoint = surl.netloc.replace(':', '')
@@ -90,23 +91,27 @@ def _walk_globus_path(client, globus_endpoint, path):
     return files
 
 
-def create_bag_archive(manifest, bag_metadata, ro_metadata):
+def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
     try:
-        bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
-        remote_manifest_filename = join(settings.BAG_STAGING_DIR,
-                                        str(uuid.uuid4()))
+        if not name:
+            now = datetime.datetime.now()
+            name = 'Concierge-Bag-{}'.format(now.strftime('%B-%d-%Y'))
 
+        base_folder = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
+        os.mkdir(base_folder)
+        bag_name = join(base_folder, name)
+        os.mkdir(bag_name)
+
+        remote_manifest_filename = join(base_folder, str(uuid.uuid4()))
         with open(remote_manifest_filename, 'w') as f:
             f.write(json.dumps(manifest))
 
-        os.mkdir(bag_name)
         bdbag_api.make_bag(bag_name,
                            metadata=bag_metadata,
                            ro_metadata=ro_metadata,
                            remote_file_manifest=remote_manifest_filename,
                            )
         bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
-
         archive_name = '{}.{}'.format(bag_name, settings.BAG_ARCHIVE_FORMAT)
         os.remove(remote_manifest_filename)
         return archive_name
@@ -114,7 +119,16 @@ def create_bag_archive(manifest, bag_metadata, ro_metadata):
         raise ConciergeException(str(e), code='bdbag_creation_error')
 
 
-def upload_to_s3(filename, key):
+def get_s3_key(filename):
+    return os.path.join(
+        settings.AWS_FOLDER,
+        os.path.basename(os.path.dirname(filename)),
+        os.path.basename(filename)
+    )
+
+
+def upload_to_s3(filename):
+    key = get_s3_key(filename)
     s3 = boto3.resource('s3', aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY)
     with open(filename, 'rb') as data:
@@ -123,6 +137,9 @@ def upload_to_s3(filename, key):
             key,
             ExtraArgs={'ACL': 'public-read'}
         )
+    loc = 'https://s3.amazonaws.com/{}/{}'.format(settings.AWS_BUCKET_NAME,
+                                                  key)
+    return loc
 
 
 def _resolve_minids_to_bags(user, minids):

@@ -19,12 +19,9 @@ def load_identifier_client(user):
                             app_name='Concierge Service',
                             authorizer=ac)
 
-def create_minid(user, filename, aws_bucket_filename, metadata={},
+def create_minid(user, filename, locations, metadata={},
                  visible_to=('public',), test=True):
     checksum = minid_client_api.compute_checksum(filename)
-    locations = ["https://s3.amazonaws.com/%s/%s" % (
-                             settings.AWS_BUCKET_NAME,
-                             aws_bucket_filename)]
     ic = load_identifier_client(user)
     log.debug('checksum: {}'.format(checksum))
     namespace = (settings.TEST_IDENTIFIER_NAMESPACE

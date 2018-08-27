@@ -30,7 +30,8 @@ ALLOWED_HOSTS = []
 # AWS access
 AWS_ACCESS_KEY_ID = ""
 AWS_SECRET_ACCESS_KEY = ""
-AWS_BUCKET_NAME = "portal-sc17-nick-globuscs-info"
+AWS_BUCKET_NAME = "fair-research-concierge"
+AWS_FOLDER = 'bags'
 
 # Globus
 GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'

@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import os
+import re
 import json
 import logging
 from django.conf import settings
@@ -19,22 +20,30 @@ log = logging.getLogger(__name__)
 class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     minid = serializers.CharField(max_length=255, read_only=True)
-    remote_file_manifest = serializers.JSONField(required=True,
-                                                 write_only=True)
     minid_metadata = serializers.JSONField(required=False, write_only=True)
+    minid_location = serializers.JSONField(read_only=True)
     minid_test = serializers.BooleanField(required=False,
                                           default=settings.DEFAULT_TEST_MINIDS)
-    visible_to = serializers.JSONField(required=False, write_only=True)
-    metadata = serializers.JSONField(required=False)
-    ro_metadata = serializers.JSONField(required=False)
-    location = serializers.CharField(max_length=255, read_only=True)
+    minid_visible_to = serializers.JSONField(required=False, write_only=True)
+    bag_name = serializers.CharField(max_length=128, required=False)
+    bag_metadata = serializers.JSONField(required=False)
+    bag_ro_metadata = serializers.JSONField(required=False)
+    remote_file_manifest = serializers.JSONField(required=True,
+                                                 write_only=True)
     verify_remote_files = serializers.BooleanField(required=False)
 
     class Meta:
         model = Bag
-        fields = ('id', 'url', 'minid', 'remote_file_manifest',
-                  'minid_metadata', 'minid_test', 'visible_to', 'metadata',
-                  'ro_metadata', 'location', 'verify_remote_files')
+        fields = ('id', 'url', 'minid', 'minid_metadata', 'minid_location',
+                  'minid_test', 'minid_visible_to', 'bag_name', 'bag_metadata',
+                  'bag_ro_metadata', 'remote_file_manifest',
+                  'verify_remote_files')
+
+    def validate_bag_name(self, bag_name):
+        if re.search(r'[^\w_\-\.]', bag_name):
+            raise ValidationError('Only [-_.] special characters allowed in '
+                                  'filename.')
+
 
     def validate_remote_file_manifest(self, manifest):
         for record in manifest:
@@ -47,9 +56,9 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate(self, data):
         if data.get('verify_remote_files'):
-            data['remote_files_manifest'] = verify_remote_file_manifest(
+            data['remote_file_manifest'] = verify_remote_file_manifest(
                 self.context['request'].user,
-                data['remote_files_manifest']
+                data['remote_file_manifest']
             )
         return data
 
@@ -58,26 +67,22 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
 
         bag_metadata = validated_data.get('metadata')
         bag_filename = create_bag_archive(validated_manifest, bag_metadata,
-                                          validated_data.get('ro_metadata'))
+                                          validated_data.get('ro_metadata'),
+                                          validated_data.get('bag_name'))
 
-        s3_bag_filename = os.path.basename(bag_filename)
-        upload_to_s3(bag_filename, s3_bag_filename)
-
-        loc = ('https://s3.amazonaws.com/{}/{}'.format(
-               settings.AWS_BUCKET_NAME, s3_bag_filename)
-              )
+        locations = [upload_to_s3(bag_filename),]
         user = self.context['request'].user
 
-        validated_data['location'] = loc
+        validated_data['location'] = locations[0]
         metad, visible_to, test = (validated_data.get('minid_metadata'),
                                    validated_data.get('visible_to') or
                                                       ('public',),
                                    validated_data.get('minid_test'))
-        minid = create_minid(user, bag_filename, s3_bag_filename, metad,
+        minid = create_minid(user, bag_filename, locations, metad,
                              visible_to, test)
         os.remove(bag_filename)
         return Bag.objects.create(user=user, minid=minid['identifier'],
-                                  location=loc)
+                                  location=locations)
 
 
 class StageBagSerializer(serializers.HyperlinkedModelSerializer):
