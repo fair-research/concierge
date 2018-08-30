@@ -25,7 +25,8 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     minid_test = serializers.BooleanField(required=False,
                                           default=settings.DEFAULT_TEST_MINIDS)
     minid_visible_to = serializers.JSONField(required=False, write_only=True)
-    bag_name = serializers.CharField(max_length=128, required=False)
+    bag_name = serializers.CharField(allow_blank=True, max_length=128,
+                                     required=False)
     bag_metadata = serializers.JSONField(required=False)
     bag_ro_metadata = serializers.JSONField(required=False)
     remote_file_manifest = serializers.JSONField(required=True,
