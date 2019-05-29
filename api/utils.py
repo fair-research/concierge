@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+import datetime
 import os
 from os.path import join
 import json
@@ -9,30 +10,36 @@ import boto3
 import globus_sdk
 from six.moves.urllib_parse import urlsplit
 from django.conf import settings
-from minid_client import minid_client_api
 import bagit
 from bdbag import bdbag_api
+from identifier_client.identifier_api import IdentifierClientError
 
 from api.models import Bag
-from api.exc import ConciergeException, ServiceAuthException
+from api.exc import ConciergeException
+from api.minid import load_identifier_client
+from api.auth import get_transfer_token
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
 # increments
 HTTP_CHUNK_SIZE = 2**10
 
-
-def validate_remote_files_manifest(remote_files_manifest, transfer_token):
+def load_transfer_client(user):
+    transfer_token = get_transfer_token(user)
     transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
-    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    return globus_sdk.TransferClient(authorizer=transfer_authorizer)
+
+
+def verify_remote_file_manifest(user, remote_file_manifest):
+    tc = load_transfer_client(user)
 
     new_manifest = []
-    for record in remote_files_manifest:
+    for record in remote_file_manifest:
         surl = urlsplit(record['url'])
         if surl.scheme not in settings.SUPPORTED_STAGING_PROTOCOLS:
             new_manifest.append(record)
             log.debug('Verification skipped record {} (non-globus)'.format(
-                record['name']
+                record['filename']
             ))
             continue
         globus_endpoint = surl.netloc.replace(':', '')
@@ -84,23 +91,27 @@ def _walk_globus_path(client, globus_endpoint, path):
     return files
 
 
-def create_bag_archive(manifest, bag_metadata, ro_metadata):
+def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
     try:
-        bag_name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
-        remote_manifest_filename = join(settings.BAG_STAGING_DIR,
-                                        str(uuid.uuid4()))
+        if not name:
+            now = datetime.datetime.now()
+            name = 'Concierge-Bag-{}'.format(now.strftime('%B-%d-%Y'))
 
+        base_folder = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
+        os.mkdir(base_folder)
+        bag_name = join(base_folder, name)
+        os.mkdir(bag_name)
+
+        remote_manifest_filename = join(base_folder, str(uuid.uuid4()))
         with open(remote_manifest_filename, 'w') as f:
             f.write(json.dumps(manifest))
 
-        os.mkdir(bag_name)
         bdbag_api.make_bag(bag_name,
                            metadata=bag_metadata,
                            ro_metadata=ro_metadata,
                            remote_file_manifest=remote_manifest_filename,
                            )
         bdbag_api.archive_bag(bag_name, settings.BAG_ARCHIVE_FORMAT)
-
         archive_name = '{}.{}'.format(bag_name, settings.BAG_ARCHIVE_FORMAT)
         os.remove(remote_manifest_filename)
         return archive_name
@@ -108,73 +119,16 @@ def create_bag_archive(manifest, bag_metadata, ro_metadata):
         raise ConciergeException(str(e), code='bdbag_creation_error')
 
 
-def _register_minid(minid_user, minid_email, minid_title, minid_test,
-                    globus_auth_token, checksum, locations):
-    try:
-        minid = minid_client_api.register_entity(
-            settings.MINID_SERVER,
-            checksum,
-            minid_email,
-            None,
-            locations,
-            minid_title,
-            minid_test,
-            globus_auth_token=globus_auth_token
-        )
-    except minid_client_api.MinidAPIException as minid_exc:
-        if minid_exc.type == 'UserNotRegistered':
-            try:
-                minid_client_api.register_user(
-                    settings.MINID_SERVER,
-                    minid_email,
-                    minid_user,
-                    '',  # ORCID is not currently used
-                    globus_auth_token=globus_auth_token
-                )
-                minid = minid_client_api.register_entity(
-                    settings.MINID_SERVER,
-                    checksum,
-                    minid_email,
-                    None,
-                    locations,
-                    minid_title,
-                    minid_test,
-                    globus_auth_token=globus_auth_token
-                )
-            except minid_client_api.MinidAPIException as minid_exc:
-                msg = 'Failed to created minid, user not registered and ' \
-                      'auto-registration failed: {}'.format(minid_exc.message)
-                if minid_exc.code in [401, 403]:
-                    raise ServiceAuthException(msg, code='minid_auth_error')
-                else:
-                    log.error('"{}": {}'.format(minid_email, msg))
-                    raise ConciergeException(msg, code='minid_auth_error')
-        else:
-            msg = 'Could not create minid: {}'.format(minid_exc.message)
-            if minid_exc.code in [401, 403]:
-                raise ServiceAuthException(msg, code='minid_auth_error')
-            else:
-                log.error('"{}": {}'.format(minid_email, msg))
-                raise ConciergeException(msg, code='minid_auth_error')
-    return minid
+def get_s3_key(filename):
+    return os.path.join(
+        settings.AWS_FOLDER,
+        os.path.basename(os.path.dirname(filename)),
+        os.path.basename(filename)
+    )
 
 
-def create_minid(filename, aws_bucket_filename, minid_user,
-                 minid_email, minid_title, minid_test, globus_auth_token):
-    checksum = minid_client_api.compute_checksum(filename)
-    locations = ["https://s3.amazonaws.com/%s/%s" % (
-                             settings.AWS_BUCKET_NAME,
-                             aws_bucket_filename
-                        )]
-    log.debug('Computed Minid Checksum.')
-    minid = _register_minid(minid_user, minid_email, minid_title, minid_test,
-                            globus_auth_token, checksum, locations)
-    log.debug('Created new minid for user {}: {}'.format(minid_user, minid))
-
-    return minid
-
-
-def upload_to_s3(filename, key):
+def upload_to_s3(filename):
+    key = get_s3_key(filename)
     s3 = boto3.resource('s3', aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY)
     with open(filename, 'rb') as data:
@@ -183,32 +137,39 @@ def upload_to_s3(filename, key):
             key,
             ExtraArgs={'ACL': 'public-read'}
         )
+    loc = 'https://s3.amazonaws.com/{}/{}'.format(settings.AWS_BUCKET_NAME,
+                                                  key)
+    return loc
 
 
-def _resolve_minids_to_bags(bag_minids, user):
-    bags = Bag.objects.filter(minid_id__in=bag_minids)
+def _resolve_minids_to_bags(user, minids):
+    bags = Bag.objects.filter(minid__in=minids)
     bags = list(bags)
-    if len(bags) != len(bag_minids):
-        bad_bags = [b for b in bag_minids
-                    if b not in [bg.minid_id for bg in bags]]
+    if len(bags) != len(minids):
+        bad_bags = [b for b in minids
+                    if b not in [bg.minid for bg in bags]]
         for minid in bad_bags:
-            ent = minid_client_api.get_entities(settings.MINID_SERVER, minid,
-                                            settings.MINID_TEST)
-            if not len(ent[minid]['locations']) > 0:
-                raise ConciergeException({'error': 'Minid has no location {}'
-                                         ''.format(minid)})
-            loc = ent[minid]['locations'][0]['link']
-            b = Bag.objects.create(user=user, minid_id=minid, location=loc)
-            b.save()
-            bags.append(b)
+            try:
+                ic = load_identifier_client(user)
+                minid = ic.get_identifier(minid).data
+                if not minid['location']:
+                    raise ConciergeException({'error': 'Minid has no location '
+                                             '{}'.format(minid)})
+                loc = minid['location'][0]
+                b = Bag.objects.create(user=user, minid=minid, location=loc)
+                b.save()
+                bags.append(b)
+            except IdentifierClientError as ice:
+                log.exception(ice)
+                log.error('User {} unable to resolve minid data.'.format(user))
     return bags
 
 
-def fetch_bags(minids, user):
+def fetch_bags(user, minids):
     """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
-    bags = _resolve_minids_to_bags(minids, user)
+    bags = _resolve_minids_to_bags(user, minids)
     bagit_bags = []
     for bag in bags:
         bag_name = os.path.basename(bag.location)
@@ -266,19 +227,18 @@ def catalog_transfer_manifest(bagit_bags):
     return endpoint_catalog, error_catalog
 
 
-def transfer_catalog(transfer_manifest, dest_endpoint,
-                     dest_prefix, transfer_token,
+def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
-    transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
-    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+    tc = load_transfer_client(user)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:
-        raise ValidationError('No valid data to transfer',
-                              code='no_data')
+        raise ConciergeException('No valid data to transfer',
+                                 code='no_data')
     for globus_source_endpoint, data_list in transfer_manifest.items():
-        log.debug('Starting transfer from {} to {}:{} containing {} files'
-                  .format(globus_source_endpoint, dest_endpoint, dest_prefix,
+        log.debug('{} starting transfer from {} to {}:{} containing {} files'
+                  .format(user, globus_source_endpoint, dest_endpoint,
+                          dest_prefix,
                           len(data_list)))
         tc.endpoint_autoactivate(globus_source_endpoint)
         tdata = globus_sdk.TransferData(tc,

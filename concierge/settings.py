@@ -30,7 +30,8 @@ ALLOWED_HOSTS = []
 # AWS access
 AWS_ACCESS_KEY_ID = ""
 AWS_SECRET_ACCESS_KEY = ""
-AWS_BUCKET_NAME = "portal-sc17-nick-globuscs-info"
+AWS_BUCKET_NAME = "fair-research-concierge"
+AWS_FOLDER = 'bags'
 
 # Globus
 GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'
@@ -48,9 +49,17 @@ SUPPORTED_STAGING_PROTOCOLS = ['globus']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
 
+#GLOBUS_KEY = '4752a5da-450f-4a9b-bc60-66be6ce7258a'
+GLOBUS_KEY = '524361f2-e4a9-4bd0-a3a6-03e365cac8a9'
+GLOBUS_SECRET = 'mkiU14Wzla8TVW447hO7SA5ah2/PYlRFbD7k9GRsCoI='
+
+# Id for creating minids
+TEST_IDENTIFIER_NAMESPACE = 'HHxPIZaVDh9u'
+IDENTIFIER_NAMESPACE = 'kHAAfCby2zdn'
+DEFAULT_TEST_MINIDS = True
+
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -158,7 +167,7 @@ LOGGING = {
                     },
         'api': {
             'handlers': ['stream'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propagate': True,
         },
         'concierge': {
