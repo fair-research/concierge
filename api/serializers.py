@@ -46,9 +46,13 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                                   'filename.')
         return bag_name
 
-
     def validate_remote_file_manifest(self, manifest):
+        if not isinstance(manifest, list):
+            raise ValidationError('Manifest must be a list')
         for record in manifest:
+            if not isinstance(record, dict):
+                raise ValidationError('Every record in the remote file'
+                                      'manifest must be a simple object')
             fname, url = record.get('filename'), record.get('url')
             if not fname or not url:
                 raise ValidationError('Error in remote file manifest, '
