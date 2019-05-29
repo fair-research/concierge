@@ -12,7 +12,7 @@ from six.moves.urllib_parse import urlsplit
 from django.conf import settings
 import bagit
 from bdbag import bdbag_api
-from identifier_client.identifier_api import IdentifierClientError
+from identifiers_client.identifiers_api import IdentifierClientError
 
 from api.models import Bag
 from api.exc import ConciergeException
