@@ -125,6 +125,15 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
         ret_val = super(StageBagSerializer, self).to_internal_value(obj)
         return ret_val
 
+    def validate_minids(self, minids):
+        try:
+            mval = json.loads(minids)
+            if not isinstance(mval, list):
+                raise ValidationError('Minids must be an array')
+        except Exception:
+            raise ValidationError('Minids must be an array')
+        return minids
+
     def create(self, validated_data):
         try:
             minids = json.loads(validated_data['minids'])
