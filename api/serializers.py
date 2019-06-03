@@ -76,19 +76,19 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                                           validated_data.get('ro_metadata'),
                                           validated_data.get('bag_name'))
 
-        locations = [upload_to_s3(bag_filename),]
+        location = upload_to_s3(bag_filename)
         user = self.context['request'].user
 
-        validated_data['location'] = locations[0]
+        validated_data['location'] = location
         metad, visible_to, test = (validated_data.get('minid_metadata'),
                                    validated_data.get('visible_to') or
-                                                      ('public',),
+                                   ('public',),
                                    validated_data.get('minid_test'))
-        minid = create_minid(user, bag_filename, locations, metad,
+        minid = create_minid(user, bag_filename, [location], metad,
                              visible_to, test)
         os.remove(bag_filename)
         return Bag.objects.create(user=user, minid=minid['identifier'],
-                                  location=locations)
+                                  location=location)
 
 
 class StageBagSerializer(serializers.HyperlinkedModelSerializer):
