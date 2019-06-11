@@ -3,15 +3,13 @@ import os
 import shutil
 from unittest.mock import Mock
 
-from api import utils
+from api import utils, minid
 from api.tests.unit.mocks import (TEST_BAG, MOCK_TOKENS,
                                   MOCK_IDENTIFIERS_GET_RESPONSE)
-from api.models import Bag, TokenStore
-from api import minid
+from api.models import TokenStore
 
 
 TEST_FOLDER = '/tmp/concierge_unit_tests/'
-
 
 
 @pytest.fixture

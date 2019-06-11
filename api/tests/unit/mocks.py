@@ -21,13 +21,13 @@ MOCK_IDENTIFIERS_GET_RESPONSE = {
   "checksums": [
     {
       "function": "sha256",
-      "value": "3e39e3ebd01a65ddf2d44f7124ddb471c62687b0caee3eaf5f6bfc4927a76795"
+      "value": "sha256hash"
     }
   ],
   "identifier": "ark:/99999/fk4Q8Vm1Bcm7QYM",
   "landing_page": "https://identifiers.globus.org/ark:/99999/fk4Q8Vm1Bcm7QYM",
   "location": [
-    "https://s3.amazonaws.com/fair-research-concierge/bags/84d4d476-2e8b-4cb8-bda7-094b654bbd86/Concierge-Bag-June-11-2019.zip"
+    "Concierge-Bag-June-11-2019.zip"
   ],
   "metadata": {},
   "visible_to": [

@@ -17,7 +17,7 @@ class ConciergeException(APIException):
         self.status_code = kwargs.get('status_code', self.default_status_code)
         self.detail = args[0] if args else self.default_detail
         log.debug('Request error, Detail: "{}", Code: "{}", Status: "{}"'
-            .format(self.detail, self.code, self.status_code))
+                  .format(self.detail, self.code, self.status_code))
 
 
 class NoDataToTransfer(ConciergeException):

@@ -15,7 +15,7 @@ from bdbag import bdbag_api
 from identifiers_client.identifiers_api import IdentifierClientError
 
 from api.models import Bag
-from api.exc import ConciergeException
+from api.exc import NoDataToTransfer, ConciergeException
 from api import minid
 from api.auth import get_transfer_token
 
