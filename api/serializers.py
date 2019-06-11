@@ -95,6 +95,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     id = serializers.IntegerField(read_only=True)
     minids = serializers.JSONField(required=True)
+    bag_dirs = serializers.BooleanField(required=False, default=False)
     transfer_catalog = serializers.JSONField(read_only=True)
     error_catalog = serializers.JSONField(read_only=True)
     transfer_task_ids = serializers.JSONField(read_only=True)
@@ -138,7 +139,9 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
         try:
             minids = json.loads(validated_data['minids'])
             bagit_bags = fetch_bags(self.context['request'].user, minids)
-            catalog, error_catalog = catalog_transfer_manifest(bagit_bags)
+            bag_dirs = validated_data.pop('bag_dirs')
+            catalog, error_catalog = catalog_transfer_manifest(
+                bagit_bags, use_bag_dirs=bag_dirs)
             task_ids = transfer_catalog(
                 self.context['request'].user,
                 catalog,
@@ -153,5 +156,6 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             stage_bag_data.update(validated_data)
             return StageBag.objects.create(**stage_bag_data)
         except globus_sdk.exc.TransferAPIError as te:
+            log.debug(te)
             raise GlobusTransferException(detail={'error': te.message,
                                           'code': te.code})

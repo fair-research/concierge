@@ -203,7 +203,7 @@ def fetch_bags(user, minids):
     return [extract_bag(download_bag(bag.location)) for bag in bags]
 
 
-def catalog_transfer_manifest(bagit_bags):
+def catalog_transfer_manifest(bagit_bags, bag_dirs=False):
     """Given a list of bagit bags, return a catalogue of all files
     organized by endpoint, and the list of files that can't be
     transferred.
@@ -229,10 +229,13 @@ def catalog_transfer_manifest(bagit_bags):
                 prot_errors.append(url)
                 error_catalog['unsupported_protocol'] = prot_errors
                 continue
-            globus_endpoint = surl.netloc.replace(':', '')
-            payload = endpoint_catalog.get(globus_endpoint, [])
-            payload.append(surl.path)
-            endpoint_catalog[globus_endpoint] = payload
+            payload = endpoint_catalog.get(surl.netloc, [])
+            if bag_dirs:
+                bag_name = os.path.basename(bag.path)
+                payload.append((surl.path, os.path.join(bag_name, filename)))
+            else:
+                payload.append((surl.path, surl.path))
+            endpoint_catalog[surl.netloc] = payload
     if not endpoint_catalog:
         raise NoDataToTransfer(f'Unable to transfer {error_catalog}')
     return endpoint_catalog, error_catalog
@@ -258,11 +261,8 @@ def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
                                         label=settings.SERVICE_NAME,
                                         sync_level=sync_level
                                         )
-        for item in data_list:
-            tdata.add_item(
-                item,
-                '/'.join((dest_prefix, item))
-            )
+        for source, destination in data_list:
+            tdata.add_item(source, os.path.join((dest_prefix, destination)))
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])
     return task_ids
