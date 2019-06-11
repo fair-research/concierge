@@ -141,7 +141,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             bagit_bags = fetch_bags(self.context['request'].user, minids)
             bag_dirs = validated_data.pop('bag_dirs')
             catalog, error_catalog = catalog_transfer_manifest(
-                bagit_bags, use_bag_dirs=bag_dirs)
+                bagit_bags, bag_dirs=bag_dirs)
             task_ids = transfer_catalog(
                 self.context['request'].user,
                 catalog,

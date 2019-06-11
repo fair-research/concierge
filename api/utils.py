@@ -262,7 +262,7 @@ def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
                                         sync_level=sync_level
                                         )
         for source, destination in data_list:
-            tdata.add_item(source, os.path.join((dest_prefix, destination)))
+            tdata.add_item(source, os.path.join(dest_prefix, destination))
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])
     return task_ids
