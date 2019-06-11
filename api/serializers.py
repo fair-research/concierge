@@ -96,6 +96,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
     id = serializers.IntegerField(read_only=True)
     minids = serializers.JSONField(required=True)
     bag_dirs = serializers.BooleanField(required=False, default=False)
+    transfer_label = serializers.CharField(write_only=True)
     transfer_catalog = serializers.JSONField(read_only=True)
     error_catalog = serializers.JSONField(read_only=True)
     transfer_task_ids = serializers.JSONField(read_only=True)
@@ -139,6 +140,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
         try:
             minids = json.loads(validated_data['minids'])
             bagit_bags = fetch_bags(self.context['request'].user, minids)
+            transfer_label = validated_data.pop('transfer_label')
             bag_dirs = validated_data.pop('bag_dirs')
             catalog, error_catalog = catalog_transfer_manifest(
                 bagit_bags, bag_dirs=bag_dirs)
@@ -146,7 +148,8 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
                 self.context['request'].user,
                 catalog,
                 validated_data['destination_endpoint'],
-                validated_data['destination_path_prefix']
+                validated_data['destination_path_prefix'],
+                label=transfer_label
                 )
             stage_bag_data = {'user': self.context['request'].user,
                               'transfer_catalog': json.dumps(catalog),

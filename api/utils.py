@@ -242,6 +242,7 @@ def catalog_transfer_manifest(bagit_bags, bag_dirs=False):
 
 
 def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
+                     label=None,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
     tc = load_transfer_client(user)
@@ -249,6 +250,7 @@ def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
     if not transfer_manifest:
         raise ConciergeException('No valid data to transfer',
                                  code='no_data')
+    label = label or settings.SERVICE_NAME
     for globus_source_endpoint, data_list in transfer_manifest.items():
         log.debug('{} starting transfer from {} to {}:{} containing {} files'
                   .format(user, globus_source_endpoint, dest_endpoint,
@@ -258,7 +260,7 @@ def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
         tdata = globus_sdk.TransferData(tc,
                                         globus_source_endpoint,
                                         dest_endpoint,
-                                        label=settings.SERVICE_NAME,
+                                        label=label,
                                         sync_level=sync_level
                                         )
         for source, destination in data_list:
