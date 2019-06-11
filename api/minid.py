@@ -9,7 +9,7 @@ from api.models import TokenStore
 log = logging.getLogger(__name__)
 
 
-def load_identifier_client(user):
+def load_identifiers_client(user):
     token = TokenStore.get_id_token(user)
     log.debug('Identifier user {}, has token: {}' .format(user, bool(token)))
     ac = globus_sdk.AccessTokenAuthorizer(token) if token else None
@@ -20,7 +20,7 @@ def load_identifier_client(user):
 def create_minid(user, filename, locations, metadata={},
                  visible_to=('public',), test=True):
     checksum = minid_client_api.compute_checksum(filename)
-    ic = load_identifier_client(user)
+    ic = load_identifiers_client(user)
     log.debug('checksum: {}'.format(checksum))
     namespace = (settings.TEST_IDENTIFIER_NAMESPACE
                  if test else settings.IDENTIFIER_NAMESPACE)
