@@ -234,10 +234,7 @@ def catalog_transfer_manifest(bagit_bags):
             payload.append(surl.path)
             endpoint_catalog[globus_endpoint] = payload
     if not endpoint_catalog:
-        raise ConciergeException({
-            'error': 'No valid data to transfer',
-            'error_catalog': error_catalog
-        })
+        raise NoDataToTransfer(f'Unable to transfer {error_catalog}')
     return endpoint_catalog, error_catalog
 
 
