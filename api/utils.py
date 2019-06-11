@@ -16,13 +16,14 @@ from identifiers_client.identifiers_api import IdentifierClientError
 
 from api.models import Bag
 from api.exc import ConciergeException
-from api.minid import load_identifier_client
+from api import minid
 from api.auth import get_transfer_token
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
 # increments
 HTTP_CHUNK_SIZE = 2**10
+
 
 def load_transfer_client(user):
     transfer_token = get_transfer_token(user)
@@ -91,14 +92,21 @@ def _walk_globus_path(client, globus_endpoint, path):
     return files
 
 
+def create_unique_folder():
+    name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
+    while os.path.exists(name):
+        name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
+    os.mkdir(name)
+    return name
+
+
 def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
     try:
         if not name:
             now = datetime.datetime.now()
             name = 'Concierge-Bag-{}'.format(now.strftime('%B-%d-%Y'))
 
-        base_folder = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
-        os.mkdir(base_folder)
+        base_folder = create_unique_folder()
         bag_name = join(base_folder, name)
         os.mkdir(bag_name)
 
@@ -148,14 +156,14 @@ def _resolve_minids_to_bags(user, minids):
     if len(bags) != len(minids):
         bad_bags = [b for b in minids
                     if b not in [bg.minid for bg in bags]]
-        for minid in bad_bags:
+        for bag_minid in bad_bags:
             try:
-                ic = load_identifier_client(user)
-                minid = ic.get_identifier(minid).data
-                if not minid['location']:
+                ic = minid.load_identifiers_client(user)
+                minid_resp = ic.get_identifier(bag_minid).data
+                if not minid_resp['location']:
                     raise ConciergeException({'error': 'Minid has no location '
                                              '{}'.format(minid)})
-                loc = minid['location'][0]
+                loc = minid_resp['location'][0]
                 b = Bag.objects.create(user=user, minid=minid, location=loc)
                 b.save()
                 bags.append(b)
@@ -165,28 +173,34 @@ def _resolve_minids_to_bags(user, minids):
     return bags
 
 
+def download_bag(url):
+    """Given a URL, download an archived bag and return the path where it has
+    been downloaded."""
+    bag_name = os.path.basename(url)
+    local_bag_archive = os.path.join(create_unique_folder(), bag_name)
+    r = requests.get(url, stream=True)
+    if r.status_code == 200:
+        with open(local_bag_archive, 'wb') as f:
+            for chunk in r.iter_content(HTTP_CHUNK_SIZE):
+                f.write(chunk)
+    return local_bag_archive
+
+
+def extract_bag(local_bag_archive_path):
+    """Unachive a local bdbag, and return the local path. Places the unachived
+    bag next to the archived one, minus the archived bag's extension."""
+    local_bag, _ = os.path.splitext(local_bag_archive_path)
+    bdbag_api.extract_bag(local_bag_archive_path, os.path.dirname(local_bag))
+    bagit_bag = bagit.Bag(local_bag)
+    return bagit_bag
+
+
 def fetch_bags(user, minids):
     """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
     bags = _resolve_minids_to_bags(user, minids)
-    bagit_bags = []
-    for bag in bags:
-        bag_name = os.path.basename(bag.location)
-        local_bag_archive = os.path.join(settings.BAG_STAGING_DIR, bag_name)
-        if not os.path.exists(local_bag_archive):
-            r = requests.get(bag.location, stream=True)
-            if r.status_code == 200:
-                with open(local_bag_archive, 'wb') as f:
-                    for chunk in r.iter_content(HTTP_CHUNK_SIZE):
-                        f.write(chunk)
-        local_bag, _ = os.path.splitext(local_bag_archive)
-        if not os.path.exists(local_bag):
-            bdbag_api.extract_bag(local_bag_archive,
-                                  os.path.dirname(local_bag))
-        bagit_bag = bagit.Bag(local_bag)
-        bagit_bags.append(bagit_bag)
-    return bagit_bags
+    return [extract_bag(download_bag(bag.location)) for bag in bags]
 
 
 def catalog_transfer_manifest(bagit_bags):
