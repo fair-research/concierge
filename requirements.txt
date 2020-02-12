@@ -1,5 +1,5 @@
 django==1.11.28
-djangorestframework==3.8.1
+djangorestframework==3.9.1
 django-rest-swagger==2.1.2
 boto3>=1.7.0
 globus-sdk==1.5.0
