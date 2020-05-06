@@ -33,7 +33,8 @@ class TokenStore(models.Model):
 
     @staticmethod
     def get_id_token(user):
-        return TokenStore.get_token(user, 'identifiers.globus.org')
+        return TokenStore.get_token(user,
+                                    '85114005-42e6-4671-a73a-0a40150c2b88')
 
     @staticmethod
     def get_transfer_token(user):
@@ -44,7 +45,6 @@ class Bag(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     minid = models.CharField(max_length=30)
     location = models.CharField(max_length=255)
-
 
 
 class StageBag(models.Model):

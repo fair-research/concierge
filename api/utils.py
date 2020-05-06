@@ -12,7 +12,7 @@ from six.moves.urllib_parse import urlsplit
 from django.conf import settings
 import bagit
 from bdbag import bdbag_api
-from identifiers_client.identifiers_api import IdentifierClientError
+from fair_identifiers_client.identifiers_api import IdentifierClientError
 
 from api.models import Bag
 from api.exc import NoDataToTransfer, ConciergeException
@@ -124,6 +124,7 @@ def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
         os.remove(remote_manifest_filename)
         return archive_name
     except Exception as e:
+        log.exception(e)
         raise ConciergeException(str(e), code='bdbag_creation_error')
 
 
@@ -158,8 +159,8 @@ def _resolve_minids_to_bags(user, minids):
                     if b not in [bg.minid for bg in bags]]
         for bag_minid in bad_bags:
             try:
-                ic = minid.load_identifiers_client(user)
-                minid_resp = ic.get_identifier(bag_minid).data
+                mc = minid.load_minid_client(user)
+                minid_resp = mc.check(bag_minid).data
                 if not minid_resp['location']:
                     raise ConciergeException({'error': 'Minid has no location '
                                              '{}'.format(minid)})

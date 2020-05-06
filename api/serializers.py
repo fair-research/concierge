@@ -7,11 +7,12 @@ from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 import globus_sdk
+from minid import MinidClient
 from api.models import Bag, StageBag
 from api.utils import (create_bag_archive, upload_to_s3,
                        fetch_bags, catalog_transfer_manifest, transfer_catalog,
                        verify_remote_file_manifest)
-from api.minid import create_minid
+from api.minid import load_minid_client
 from api.exc import GlobusTransferException
 
 log = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
     minid_location = serializers.JSONField(read_only=True)
     minid_test = serializers.BooleanField(required=False,
                                           default=settings.DEFAULT_TEST_MINIDS)
+    # Deprecated, all minids are public.
     minid_visible_to = serializers.JSONField(required=False, write_only=True)
     bag_name = serializers.CharField(allow_blank=True, max_length=128,
                                      required=False)
@@ -80,15 +82,18 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
         user = self.context['request'].user
 
         validated_data['location'] = location
-        metad, visible_to, test = (validated_data.get('minid_metadata'),
-                                   validated_data.get('visible_to') or
-                                   ('public',),
-                                   validated_data.get('minid_test'))
-        minid = create_minid(user, bag_filename, [location], metad,
-                             visible_to, test)
+        metad = validated_data.get('minid_metadata')
+        test = validated_data.get('minid_test')
+        checksums = [{
+            'function': 'sha256',
+            'value': MinidClient.compute_checksum(bag_filename)
+        }]
+        mc = load_minid_client(user)
+        minid = mc.register(checksums, title=bag_filename,
+                            locations=[location], metadata=metad, test=test)
+        m_id = mc.to_identifier(minid['identifier'], identifier_type='minid')
         os.remove(bag_filename)
-        return Bag.objects.create(user=user, minid=minid['identifier'],
-                                  location=location)
+        return Bag.objects.create(user=user, minid=m_id, location=location)
 
 
 class StageBagSerializer(serializers.HyperlinkedModelSerializer):
