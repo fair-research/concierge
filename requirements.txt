@@ -1,4 +1,4 @@
-django==1.11.28
+django==1.11.29
 djangorestframework==3.9.1
 django-rest-swagger==2.1.2
 boto3>=1.7.0
