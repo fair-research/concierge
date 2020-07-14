@@ -48,24 +48,10 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                                   'filename.')
         return bag_name
 
-    def validate_remote_file_manifest(self, manifest):
-        if not isinstance(manifest, list):
-            raise ValidationError('Manifest must be a list')
-        for record in manifest:
-            if not isinstance(record, dict):
-                raise ValidationError('Every record in the remote file'
-                                      'manifest must be a simple object')
-            fname, url = record.get('filename'), record.get('url')
-            if not fname or not url:
-                raise ValidationError('Error in remote file manifest, '
-                                      'bad "filename" or "URL"')
-        log.debug('Remote File Manifest field check: PASSED.')
-        return manifest
-
     def validate(self, data):
         if data.get('verify_remote_files'):
             data['remote_file_manifest'] = verify_remote_file_manifest(
-                self.context['request'].user,
+                self.context['request'].auth,
                 data['remote_file_manifest']
             )
         return data
@@ -88,7 +74,7 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
             'function': 'sha256',
             'value': MinidClient.compute_checksum(bag_filename)
         }]
-        mc = load_minid_client(user)
+        mc = load_minid_client(self.context['request'].auth)
         minid = mc.register(checksums, title=bag_filename,
                             locations=[location], metadata=metad, test=test)
         m_id = mc.to_identifier(minid['identifier'], identifier_type='minid')
@@ -100,6 +86,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     id = serializers.IntegerField(read_only=True)
     minids = serializers.JSONField(required=True)
+    user = serializers.ReadOnlyField(source='user.username')
     bag_dirs = serializers.BooleanField(required=False, default=False)
     transfer_label = serializers.CharField(write_only=True)
     transfer_catalog = serializers.JSONField(read_only=True)
@@ -144,13 +131,13 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
     def create(self, validated_data):
         try:
             minids = json.loads(validated_data['minids'])
-            bagit_bags = fetch_bags(self.context['request'].user, minids)
+            bagit_bags = fetch_bags(self.context['request'].auth, minids)
             transfer_label = validated_data.pop('transfer_label')
             bag_dirs = validated_data.pop('bag_dirs')
             catalog, error_catalog = catalog_transfer_manifest(
                 bagit_bags, bag_dirs=bag_dirs)
             task_ids = transfer_catalog(
-                self.context['request'].user,
+                self.context['request'].auth,
                 catalog,
                 validated_data['destination_endpoint'],
                 validated_data['destination_path_prefix'],

@@ -1,44 +1,83 @@
 from __future__ import unicode_literals
 import logging
 import json
+import time
 from functools import reduce
-from globus_sdk import AccessTokenAuthorizer, TransferClient
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
+
+import api
 
 log = logging.getLogger(__name__)
 
 
-class TokenStore(models.Model):
+class ConciergeToken(models.Model):
 
     ID_SCOPE = 'identifiers.globus.org'
+    SCOPE_PERMISSIONS = {
+        settings.CONCIERGE_SCOPE: [
+            settings.MINID_SCOPE, settings.TRANSFER_SCOPE,
+        ]
+    }
 
+    id = models.CharField(max_length=128, primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    token_store = models.TextField(blank=True)
+    scope = models.CharField(max_length=128)
+    issued_at = models.FloatField()
+    expires_at = models.FloatField()
+    last_introspection = models.FloatField()
+    dependent_tokens_cache = models.TextField(blank=True)
 
     @property
-    def tokens(self):
-        return json.loads(self.token_store) if self.token_store else {}
+    def introspection_cache_expired(self):
+        """Introspection cache is the length of time we can trust the token id
+        between user invocations of this API. This is a balance of security
+        and not overloading the Globus Auth servers with requests."""
+        last_use = time.time() - self.last_introspection
+        log.debug(f'Last use was {last_use}')
+        limit = settings.GLOBUS_INTROSPECTION_CACHE_EXPIRATION
+        return last_use > limit
 
-    @tokens.setter
-    def tokens(self, value):
-        self.token_store = json.dumps(value) if value else json.dumps({})
+    @property
+    def token_expired(self):
+        log.debug(f'Token expires in {self.token_expires - time.time} secs')
+        return time.time() > self.expires_at
 
-    @staticmethod
-    def get_token(user, token_name):
-        token = TokenStore.objects.get(user=user).tokens.get(token_name)
-        log.debug('{} token for {} exists: {}'.format(token_name, user,
-                                                      bool(token)))
-        return token['access_token'] if token else None
+    def get_cached_dependent_tokens(self):
+        if self.dependent_tokens_cache:
+            return json.loads(self.dependent_tokens_cache)
+        else:
+            ac = api.auth.get_auth_client()
+            response = ac.oauth2_get_dependent_tokens(self.id).data
+            by_scope = {toks['scope']: toks for toks in response}
+            self.dependent_tokens_cache = json.dumps(by_scope)
+            self.save()
+            return by_scope
 
-    @staticmethod
-    def get_id_token(user):
-        return TokenStore.get_token(user,
-                                    '85114005-42e6-4671-a73a-0a40150c2b88')
+    def reset_introspection_cache(self):
+        self.last_introspection = time.time()
+        self.save()
 
-    @staticmethod
-    def get_transfer_token(user):
-        return TokenStore.get_token(user, 'transfer.api.globus.org')
+    def get_token(self, service):
+        if service not in self.SCOPE_PERMISSIONS[self.scope]:
+            raise api.exc.InsufficientScopesException(f'{service} not covered '
+                                                      f'by scope {self.scope}')
+        tokens = self.get_cached_dependent_tokens()
+        return tokens[service]['access_token']
+
+    def revoke_token(self):
+        ac = api.auth.get_auth_client()
+        ac.oauth2_revoke_token(self.id)
+        log.debug(f'Revoking token for user {self.user} scope {self.scope}')
+        self.delete()
+
+    @classmethod
+    def from_user(cls, user):
+        tokens = [t for t in cls.objects.filter(user=user)
+                  if not t.token_expired()]
+        if tokens:
+            return tokens[0]
 
 
 class Bag(models.Model):
@@ -61,8 +100,8 @@ class StageBag(models.Model):
 
     @property
     def status(self):
-        token = TokenStore.get_transfer_token(self.user)
-        tc = TransferClient(authorizer=AccessTokenAuthorizer(token))
+        ctoken = ConciergeToken.from_user(self.user)
+        tc = api.utils.load_transfer_client(ctoken)
         old = json.loads(self.task_catalog or '{}')
         tasks = {t: tc.get_task(t).data
                  for t in json.loads(self.transfer_task_ids)

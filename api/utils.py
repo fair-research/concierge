@@ -15,9 +15,10 @@ from bdbag import bdbag_api
 from fair_identifiers_client.identifiers_api import IdentifierClientError
 
 from api.models import Bag
-from api.exc import NoDataToTransfer, ConciergeException
+from api.exc import (
+    NoDataToTransfer, ConciergeException, GlobusTransferException
+)
 from api import minid
-from api.auth import get_transfer_token
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
@@ -25,14 +26,17 @@ log = logging.getLogger(__name__)
 HTTP_CHUNK_SIZE = 2**10
 
 
-def load_transfer_client(user):
-    transfer_token = get_transfer_token(user)
+def load_transfer_client(ctoken_obj):
+    """
+    Load a ConciergeToken Object from request.auth.
+    """
+    transfer_token = ctoken_obj.get_token(settings.TRANSFER_SCOPE)
     transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
     return globus_sdk.TransferClient(authorizer=transfer_authorizer)
 
 
-def verify_remote_file_manifest(user, remote_file_manifest):
-    tc = load_transfer_client(user)
+def verify_remote_file_manifest(auth, remote_file_manifest):
+    tc = load_transfer_client(auth)
 
     new_manifest = []
     for record in remote_file_manifest:
@@ -151,7 +155,7 @@ def upload_to_s3(filename):
     return loc
 
 
-def _resolve_minids_to_bags(user, minids):
+def _resolve_minids_to_bags(auth, minids):
     bags = Bag.objects.filter(minid__in=minids)
     bags = list(bags)
     if len(bags) != len(minids):
@@ -159,18 +163,19 @@ def _resolve_minids_to_bags(user, minids):
                     if b not in [bg.minid for bg in bags]]
         for bag_minid in bad_bags:
             try:
-                mc = minid.load_minid_client(user)
+                mc = minid.load_minid_client(auth)
                 minid_resp = mc.check(bag_minid).data
                 if not minid_resp['location']:
                     raise ConciergeException({'error': 'Minid has no location '
                                              '{}'.format(minid)})
                 loc = minid_resp['location'][0]
-                b = Bag.objects.create(user=user, minid=minid, location=loc)
+                b = Bag.objects.create(user=auth.user, minid=minid, location=loc)
                 b.save()
                 bags.append(b)
             except IdentifierClientError as ice:
                 log.exception(ice)
-                log.error('User {} unable to resolve minid data.'.format(user))
+                log.error('User {} unable to resolve minid data.'
+                          ''.format(auth.user))
     return bags
 
 
@@ -196,11 +201,11 @@ def extract_bag(local_bag_archive_path):
     return bagit_bag
 
 
-def fetch_bags(user, minids):
+def fetch_bags(auth, minids):
     """Given a list of minid bag models, follow their location and
     fetch the data associated with them, if it doesn't already
     exist on the filesystem. Returns a list of bagit bag objects"""
-    bags = _resolve_minids_to_bags(user, minids)
+    bags = _resolve_minids_to_bags(auth, minids)
     return [extract_bag(download_bag(bag.location)) for bag in bags]
 
 
@@ -242,19 +247,25 @@ def catalog_transfer_manifest(bagit_bags, bag_dirs=False):
     return endpoint_catalog, error_catalog
 
 
-def transfer_catalog(user, transfer_manifest, dest_endpoint, dest_prefix,
+def transfer_catalog(auth, transfer_manifest, dest_endpoint, dest_prefix,
                      label=None,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
-    tc = load_transfer_client(user)
+    tc = load_transfer_client(auth)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:
         raise ConciergeException('No valid data to transfer',
                                  code='no_data')
+    try:
+        log.debug(f'Testing {dest_endpoint}{dest_prefix}')
+        tc.operation_ls(dest_endpoint, path=dest_prefix)
+    except globus_sdk.exc.TransferAPIError as tapie:
+        raise GlobusTransferException(f'Could not transfer to "{dest_endpoint}'
+                                      f'{dest_prefix}": {str(tapie)}')
     label = label or settings.SERVICE_NAME
     for globus_source_endpoint, data_list in transfer_manifest.items():
         log.debug('{} starting transfer from {} to {}:{} containing {} files'
-                  .format(user, globus_source_endpoint, dest_endpoint,
+                  .format(auth.user, globus_source_endpoint, dest_endpoint,
                           dest_prefix,
                           len(data_list)))
         tc.endpoint_autoactivate(globus_source_endpoint)

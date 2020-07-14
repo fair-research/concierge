@@ -37,3 +37,10 @@ class ServiceAuthException(ConciergeException):
     default_detail = 'A Concierge subservice was unable to authenticate with '\
                      'the credentials provided'
     default_code = 'subservice_auth_error'
+
+
+class InsufficientScopesException(ConciergeException):
+    default_status_code = status.HTTP_403_FORBIDDEN
+    default_detail = 'The user attempted an action which was not authorized ' \
+                     'for the token used in this request'
+    default_code = 'insufficient_scopes'
