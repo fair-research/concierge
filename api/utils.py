@@ -169,7 +169,8 @@ def _resolve_minids_to_bags(auth, minids):
                     raise ConciergeException({'error': 'Minid has no location '
                                              '{}'.format(minid)})
                 loc = minid_resp['location'][0]
-                b = Bag.objects.create(user=auth.user, minid=minid, location=loc)
+                b = Bag.objects.create(user=auth.user, minid=minid,
+                                       location=loc)
                 b.save()
                 bags.append(b)
             except IdentifierClientError as ice:
@@ -276,6 +277,8 @@ def transfer_catalog(auth, transfer_manifest, dest_endpoint, dest_prefix,
                                         sync_level=sync_level
                                         )
         for source, destination in data_list:
+            if destination.startswith('/'):
+                destination = destination[1:]
             tdata.add_item(source, os.path.join(dest_prefix, destination))
         task = tc.submit_transfer(tdata)
         task_ids.append(task['task_id'])

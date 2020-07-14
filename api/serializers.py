@@ -3,6 +3,8 @@ import os
 import re
 import json
 import logging
+import urllib
+import uuid
 from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -18,9 +20,51 @@ from api.exc import GlobusTransferException
 log = logging.getLogger(__name__)
 
 
+class RemoteURL(serializers.Field):
+    """
+    Color objects are serialized into 'rgb(#, #, #)' notation.
+    """
+    def to_representation(self, value):
+        return value
+
+    def to_internal_value(self, data):
+
+        purl = urllib.parse.urlparse(data)
+        if purl.scheme not in settings.SUPPORTED_BAG_PROTOCOLS:
+            raise ValidationError('Unsupported protocol, expected one of: '
+                                  f'{settings.SUPPORTED_BAG_PROTOCOLS}')
+
+        if purl.scheme == 'globus':
+            try:
+                uuid.UUID(purl.netloc)
+            except ValueError:
+                raise ValidationError('Globus Endpoint is not a UUID: '
+                                      f'{data}')
+
+        return data
+
+
+class RemoteFileManifestEntrySerializer(serializers.Serializer):
+
+    SUPPORTED_CHECKSUMS = ['md5', 'sha256']
+
+    url = RemoteURL()
+    length = serializers.IntegerField()
+    filename = serializers.CharField(max_length=256)
+    md5 = serializers.CharField(max_length=32, required=False)
+    sha256 = serializers.CharField(max_length=64, required=False)
+
+    def validate(self, data):
+        if not any(data.get(f) for f in self.SUPPORTED_CHECKSUMS):
+            raise ValidationError(f'Required one of '
+                                  f'{self.SUPPORTED_CHECKSUMS}')
+        return data
+
+
 class BagSerializer(serializers.HyperlinkedModelSerializer):
 
     minid = serializers.CharField(max_length=255, read_only=True)
+    user = serializers.ReadOnlyField(source='user.username')
     minid_metadata = serializers.JSONField(required=False, write_only=True)
     minid_location = serializers.JSONField(read_only=True)
     minid_test = serializers.BooleanField(required=False,
@@ -31,16 +75,17 @@ class BagSerializer(serializers.HyperlinkedModelSerializer):
                                      required=False)
     bag_metadata = serializers.JSONField(required=False)
     bag_ro_metadata = serializers.JSONField(required=False)
-    remote_file_manifest = serializers.JSONField(required=True,
-                                                 write_only=True)
+    remote_file_manifest = RemoteFileManifestEntrySerializer(required=True,
+                                                             many=True,
+                                                             write_only=True)
     verify_remote_files = serializers.BooleanField(required=False)
 
     class Meta:
         model = Bag
-        fields = ('id', 'url', 'minid', 'minid_metadata', 'minid_location',
-                  'minid_test', 'minid_visible_to', 'bag_name', 'bag_metadata',
-                  'bag_ro_metadata', 'remote_file_manifest',
-                  'verify_remote_files')
+        fields = ('id', 'user', 'url', 'minid', 'minid_metadata',
+                  'minid_location', 'minid_test', 'minid_visible_to',
+                  'bag_name', 'bag_metadata', 'bag_ro_metadata',
+                  'remote_file_manifest', 'verify_remote_files')
 
     def validate_bag_name(self, bag_name):
         if re.search(r'[^\w_\-\.]', bag_name):
@@ -98,7 +143,7 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = StageBag
-        exclude = ('user',)
+        fields = '__all__'
 
     def to_representation(self, obj):
         ret_val = super(StageBagSerializer, self).to_representation(obj)

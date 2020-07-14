@@ -46,6 +46,7 @@ BAG_ARCHIVE_FORMAT = 'zip'
 
 # Other
 SUPPORTED_STAGING_PROTOCOLS = ['globus']
+SUPPORTED_BAG_PROTOCOLS = ['http', 'https', 'globus']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
 CONCIERGE_SCOPE = ('https://auth.globus.org/scopes/'
@@ -107,7 +108,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 LOGIN_URL = '/login/globus/'
-LOGOUT_URL = '/accounts/logout/'
+LOGOUT_URL = '/logout/'
 # Seconds for which a token can be used in-between introspections
 GLOBUS_INTROSPECTION_CACHE_EXPIRATION = 30
 
@@ -161,13 +162,19 @@ LOGGING = {
         'stream': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
         'null': {
             'level': 'DEBUG',
             'class': 'logging.NullHandler',
         },
     },
-
+    'formatters': {
+        'simple': {
+            'format': '{levelname} {module} {message}',
+            'style': '{',
+        },
+    },
     'loggers': {
         'django.db.backends': {
                     'handlers': ['null'],  # Quiet by default!

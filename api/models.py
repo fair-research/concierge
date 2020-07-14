@@ -81,13 +81,15 @@ class ConciergeToken(models.Model):
 
 
 class Bag(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name='bags',
+                             on_delete=models.CASCADE)
     minid = models.CharField(max_length=30)
     location = models.CharField(max_length=255)
 
 
 class StageBag(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name='stagebags',
+                             on_delete=models.CASCADE)
     destination_endpoint = models.CharField(max_length=512)
     destination_path_prefix = models.CharField(max_length=255, blank=True)
     minids = models.TextField()
