@@ -46,11 +46,30 @@ BAG_ARCHIVE_FORMAT = 'zip'
 
 # Other
 SUPPORTED_STAGING_PROTOCOLS = ['globus']
+SUPPORTED_BAG_PROTOCOLS = ['http', 'https', 'globus']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
+CONCIERGE_SCOPE = ('https://auth.globus.org/scopes/'
+                   '524361f2-e4a9-4bd0-a3a6-03e365cac8a9/concierge')
+MINID_SCOPE = ('https://auth.globus.org/scopes/identifiers.fair-research.org/'
+               'writer')
+TRANSFER_SCOPE = 'urn:globus:auth:scope:transfer.api.globus.org:all'
 
 GLOBUS_KEY = '***'
 GLOBUS_SECRET = '***'
+SOCIAL_AUTH_GLOBUS_KEY = '***'
+SOCIAL_AUTH_GLOBUS_SECRET = '***'
+SOCIAL_AUTH_GLOBUS_SCOPE = [CONCIERGE_SCOPE]
+
+SWAGGER_SETTINGS = {
+   'SECURITY_DEFINITIONS': {
+      'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+      }
+   }
+}
 
 # Id for creating minids
 TEST_IDENTIFIER_NAMESPACE = 'HHxPIZaVDh9u'
@@ -67,19 +86,31 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework_swagger',
+    'social_django',  # django social auth
+    'drf_yasg',
     'api',
 ]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'api.auth.GlobusTokenAuthentication'
+        'api.auth.GlobusTokenAuthentication',
+        'api.auth.GlobusSessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         # Anonymous users are welcome to the base API
     ],
     'EXCEPTION_HANDLER': 'api.exception_handlers.concierge_exception_handler'
 }
+
+AUTHENTICATION_BACKENDS = (
+   'social_core.backends.globus.GlobusOpenIdConnect',
+   'django.contrib.auth.backends.ModelBackend',
+)
+
+LOGIN_URL = '/login/globus/'
+LOGOUT_URL = '/logout/'
+# Seconds for which a token can be used in-between introspections
+GLOBUS_INTROSPECTION_CACHE_EXPIRATION = 30
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -104,6 +135,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'social_django.context_processors.backends',
+                'social_django.context_processors.login_redirect',
             ],
         },
     },
@@ -122,29 +155,6 @@ DATABASES = {
     }
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.'
-                'UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.'
-                'MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.'
-                'CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.'
-                'NumericPasswordValidator',
-    },
-]
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -152,13 +162,19 @@ LOGGING = {
         'stream': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
         'null': {
             'level': 'DEBUG',
             'class': 'logging.NullHandler',
         },
     },
-
+    'formatters': {
+        'simple': {
+            'format': '{levelname} {module} {message}',
+            'style': '{',
+        },
+    },
     'loggers': {
         'django.db.backends': {
                     'handlers': ['null'],  # Quiet by default!

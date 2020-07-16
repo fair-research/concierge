@@ -2,16 +2,15 @@ from __future__ import unicode_literals
 import logging
 import globus_sdk
 from minid import MinidClient
-from api.models import TokenStore
+
+from django.conf import settings
 
 log = logging.getLogger(__name__)
 
 
-def load_minid_client(user):
-    token = TokenStore.get_id_token(user)
-    log.debug('Identifier user {}, has token: {}' .format(user, bool(token)))
-    ac = globus_sdk.AccessTokenAuthorizer(token) if token else None
-    return MinidClient(authorizer=ac)
+def load_minid_client(token_obj):
+    m_token = token_obj.get_token(settings.MINID_SCOPE)
+    return MinidClient(authorizer=globus_sdk.AccessTokenAuthorizer(m_token))
 
 
 def create_minid(user, filename, locations, metadata=None, test=True):
