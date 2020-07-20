@@ -6,7 +6,7 @@ from unittest.mock import Mock
 from api import utils, minid
 from api.tests.unit.mocks import (TEST_BAG, MOCK_TOKENS,
                                   MOCK_IDENTIFIERS_GET_RESPONSE)
-from api.models import TokenStore
+from api.models import ConciergeToken
 
 
 TEST_FOLDER = '/tmp/concierge_unit_tests/'
@@ -50,7 +50,7 @@ def mock_identifiers_client(monkeypatch):
 def mock_user_bob(django_user_model):
     bob = django_user_model(username='bob')
     bob.save()
-    ts = TokenStore(user=bob)
+    ts = ConciergeToken(user=bob)
     ts.tokens = MOCK_TOKENS
     ts.save()
     return bob

@@ -15,6 +15,8 @@ from bdbag import bdbag_api
 from fair_identifiers_client.identifiers_api import IdentifierClientError
 
 from api.models import Bag
+from api.minid import load_minid_client
+from api.transfer import get_transfer_client
 from api.exc import (
     NoDataToTransfer, ConciergeException, GlobusTransferException
 )
@@ -26,17 +28,8 @@ log = logging.getLogger(__name__)
 HTTP_CHUNK_SIZE = 2**10
 
 
-def load_transfer_client(ctoken_obj):
-    """
-    Load a ConciergeToken Object from request.auth.
-    """
-    transfer_token = ctoken_obj.get_token(settings.TRANSFER_SCOPE)
-    transfer_authorizer = globus_sdk.AccessTokenAuthorizer(transfer_token)
-    return globus_sdk.TransferClient(authorizer=transfer_authorizer)
-
-
 def verify_remote_file_manifest(auth, remote_file_manifest):
-    tc = load_transfer_client(auth)
+    tc = get_transfer_client(auth)
 
     new_manifest = []
     for record in remote_file_manifest:
@@ -102,6 +95,42 @@ def create_unique_folder():
         name = join(settings.BAG_STAGING_DIR, str(uuid.uuid4()))
     os.mkdir(name)
     return name
+
+
+def bag_and_tag(auth, manifest, bag, minid):
+    bag_filename = create_bag_archive(manifest,
+                                      bag.get('metadata'),
+                                      bag.get('ro_metadata'),
+                                      bag.get('name'))
+    location = upload_to_s3(bag_filename)
+    mc = load_minid_client(auth)
+    name = os.path.splitext(os.path.basename(bag_filename))[0]
+    checksums = [{
+        'function': 'sha256',
+        'value': mc.compute_checksum(bag_filename)
+    }]
+    minid = mc.register(checksums, title=name,
+                        locations=[location],
+                        metadata=minid.get('metadata'),
+                        test=minid.get('test',
+                                       settings.DEFAULT_TEST_MINIDS))
+    from pprint import pprint
+    pprint(minid.data)
+    m_id = mc.to_identifier(minid['identifier'], identifier_type='minid')
+    mdata = minid.data
+    mdata['identifier'] = m_id
+    mdata['test'] = m_id.startswith('minid.test')
+    os.remove(bag_filename)
+    return {
+        'bag': {
+            'location': location,
+            'minid': m_id,
+            'metadata': bag.get('metadata'),
+            'ro_metadata': bag.get('ro_metadata'),
+            'name': name
+        },
+        'minid': mdata
+    }
 
 
 def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
@@ -252,7 +281,7 @@ def transfer_catalog(auth, transfer_manifest, dest_endpoint, dest_prefix,
                      label=None,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
-    tc = load_transfer_client(auth)
+    tc = get_transfer_client(auth)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:
         raise ConciergeException('No valid data to transfer',

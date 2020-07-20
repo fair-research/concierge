@@ -12,7 +12,7 @@ class ConciergeException(APIException):
     default_status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def __init__(self, *args, **kwargs):
-        super(ConciergeException, self).__init__(*args, **kwargs)
+        super().__init__(*args)
         self.code = kwargs.get('code', self.default_code)
         self.status_code = kwargs.get('status_code', self.default_status_code)
         self.detail = args[0] if args else self.default_detail
