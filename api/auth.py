@@ -11,6 +11,7 @@ from social_django.models import UserSocialAuth
 import globus_sdk
 
 import api
+import api.exc
 
 
 log = logging.getLogger(__name__)
@@ -82,6 +83,8 @@ def introspect_globus_token(raw_token):
         ctoken = api.models.ConciergeToken.objects.get(pk=raw_token)
         if not ctoken.introspection_cache_expired:
             return ctoken
+        if ctoken.token_expired:
+            raise api.exc.TokenExpired(f'Token expired for user {ctoken.user}')
     except api.models.ConciergeToken.DoesNotExist:
         ctoken = None
     try:
@@ -90,7 +93,8 @@ def introspect_globus_token(raw_token):
         token_details = ac.oauth2_token_introspect(raw_token).data
         if token_details['active'] is False:
             log.debug('Auth failed, token is not active.')
-            raise AuthenticationFailed('Token is not Active')
+            raise api.exc.TokenInactive('Introspection revealed inactive '
+                                        'token.')
         if not ctoken:
             user = get_or_create_user(token_details)
             log.debug(f'Creating new Concierge Token for {user}')
@@ -146,9 +150,20 @@ class GlobusSessionAuthentication(SessionAuthentication):
         user, _ = result
         social_auth = user.social_auth.get(provider='globus')
         tokens = social_auth.extra_data['other_tokens']
-        ctoken = [t for t in tokens
-                  if t.get('scope') == settings.CONCIERGE_SCOPE]
-        if not ctoken:
-            raise AuthenticationFailed('User does not have a vaild token')
-        concierge_token = introspect_globus_token(ctoken[0]['access_token'])
-        return concierge_token.user, concierge_token
+        ctokens = [t for t in tokens
+                   if t.get('scope') == settings.CONCIERGE_SCOPE]
+        if not ctokens:
+            raise api.exc.TokenInactive('User does not have a Globus token')
+        access_token = ctokens[0]['access_token']
+        try:
+            concierge_token = introspect_globus_token(access_token)
+            return concierge_token.user, concierge_token
+        except api.exc.TokenInactive:
+            # Remove the user's inactive social auth token so it can't be used
+            # again.
+            log.debug('Removing user social auth token due to inactivity')
+            social_auth.extra_data['other_tokens'] = [
+                t for t in tokens if t['access_token'] != access_token
+            ]
+            social_auth.save()
+        return result

@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 import logging
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework import status
 
 log = logging.getLogger(__name__)
@@ -44,3 +44,11 @@ class InsufficientScopesException(ConciergeException):
     default_detail = 'The user attempted an action which was not authorized ' \
                      'for the token used in this request'
     default_code = 'insufficient_scopes'
+
+
+class TokenInactive(AuthenticationFailed):
+    pass
+
+
+class TokenExpired(TokenInactive):
+    pass
