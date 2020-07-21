@@ -6,10 +6,12 @@ import time
 import minid
 import json
 from unittest.mock import Mock
+
+from rest_framework.test import APIClient
 from social_django.models import UserSocialAuth
 
-# import api.minid
 import api.utils
+import api.auth
 from api.tests.unit.mocks import TEST_BAG, MINID_RESPONSE
 from api.models import ConciergeToken
 
@@ -67,6 +69,12 @@ def dependent_tokens(settings):
 
 
 @pytest.fixture
+def mock_auth_client(monkeypatch):
+    monkeypatch.setattr(api.auth, 'get_auth_client', Mock())
+    return api.auth.get_auth_client()
+
+
+@pytest.fixture
 @pytest.mark.django_db
 def mock_user(django_user_model):
     bob = django_user_model(username='bob@globus.org')
@@ -77,14 +85,25 @@ def mock_user(django_user_model):
 
 
 @pytest.fixture
+def api_cli(concierge_token):
+    """returns an Authenticated API Client."""
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f'Bearer {concierge_token.id}')
+    return client
+
+
+@pytest.fixture
 @pytest.mark.django_db
 def concierge_token(mock_user, dependent_tokens, settings):
-    expires_at = 60 * 60 * 24 + time.time()
-    # We'll by default set last introspection to zero, which will mean
-    # the token will always be trusted for each call.
-    ts = ConciergeToken(user=mock_user, issued_at=time.time(),
-                        expires_at=expires_at, last_introspection=0.0,
-                        scope=settings.CONCIERGE_SCOPE)
+    now = time.time()
+    expires_at = 60 * 60 * 24 + now
+    # We'll by default set last introspection to now, which simulates the
+    # user having previously made a call with this token that triggered an
+    # introspection. That means ALL test API calls with this token will be
+    # cached and will never attempt to introspect.
+    ts = ConciergeToken(id='mock_concierge_token', user=mock_user,
+                        issued_at=now, expires_at=expires_at,
+                        last_introspection=now, scope=settings.CONCIERGE_SCOPE)
     ts.dependent_tokens_cache = json.dumps(dependent_tokens, indent=2)
     ts.save()
     return ts

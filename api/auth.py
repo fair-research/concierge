@@ -128,7 +128,9 @@ class GlobusTokenAuthentication(TokenAuthentication):
     keyword = 'Bearer'
 
     def authenticate_credentials(self, raw_token):
+        log.debug('Authorizing API Client...')
         concierge_token = introspect_globus_token(raw_token)
+        log.debug(f'Authorized API Client {concierge_token.user}')
         return concierge_token.user, concierge_token
 
 
