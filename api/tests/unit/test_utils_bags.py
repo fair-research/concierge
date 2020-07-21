@@ -9,8 +9,8 @@ def test_unpack_bag(testbag, scratch_space_dir):
 
 
 def test_fetch_bags(mock_download_returns_testbag, scratch_space_dir,
-                    mock_user_bob, mock_identifiers_client):
-    utils.fetch_bags(mock_user_bob, ['foo'])
+                    concierge_token, mock_minid_client):
+    utils.fetch_bags(concierge_token, ['foo'])
     assert len(os.listdir(scratch_space_dir)) == 2
 
 
