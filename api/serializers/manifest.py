@@ -4,8 +4,6 @@ Serializers for the Globus Manifest Spec
 More info here https://globusonline.github.io/manifests/overview.html
 """
 import logging
-import uuid
-import urllib
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -17,56 +15,22 @@ import api.transfer
 log = logging.getLogger(__name__)
 
 
-class ManifestURL(serializers.Field):
-    """
-    Manifests look like:
-    88b9b278-d301-11e9-8df7-7200012a1360.data.globus.org/share/godata/file1.txt
-
-    where '.data.globus.org' signifies this is a globus endpoint.
-    """
-    ENDPOINT_SUFFIX = '.data.globus.org'
-
-    def to_representation(self, value):
-        return value
-
-    def to_internal_value(self, data):
-
-        # URLs may omit the fake http protocol
-        if '://' not in data and not data.startswith('http://'):
-            data = f'http://{data}'
-        purl = urllib.parse.urlparse(data)
-
-        if not purl.netloc.endswith('.data.globus.org'):
-            raise ValidationError(f'{purl.netloc}: Manifest endpoints must '
-                                  f"have a '{self.ENDPOINT_SUFFIX}' suffix")
-        endpoint = purl.netloc.replace(self.ENDPOINT_SUFFIX, '')
-        try:
-            uuid.UUID(endpoint)
-        except ValueError:
-            raise ValidationError('Globus Endpoint is not a UUID: '
-                                  f'{data}')
-
-        return {
-            'endpoint': endpoint,
-            'path': purl.path,
-        }
-
-
 class ManifestChecksumSerializer(serializers.Serializer):
     algorithm = serializers.CharField()
     value = serializers.CharField()
 
 
 class ManifestItemSerializer(serializers.Serializer):
-    source_ref = ManifestURL()
+    source_ref = api.serializers.transfer.GlobusURL()
     dest_path = serializers.CharField()
     checksum = ManifestChecksumSerializer(required=False)
 
 
 class ManifestSerializer(serializers.Serializer):
 
-    manifest_items = serializers.ListField(child=ManifestItemSerializer())
-    destination = ManifestURL()
+    manifest_items = serializers.ListField(child=ManifestItemSerializer(),
+                                           min_length=1)
+    destination = api.serializers.transfer.GlobusURL()
 
     def validate_manifest_items(self, data):
         eps = {mi['source_ref']['endpoint'] for mi in data}

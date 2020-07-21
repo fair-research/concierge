@@ -8,8 +8,9 @@ from api.serializers.bag import (
     BagMetadataSerializer, RemoteFileManifestEntrySerializer
 )
 from api.serializers.manifest import (
-    ManifestURL, ManifestChecksumSerializer, ManifestItemSerializer
+    ManifestChecksumSerializer, ManifestItemSerializer
 )
+from api.serializers.transfer import GlobusURL
 from api.exc import ConciergeException
 from api.models import Bag
 from api.utils import bag_and_tag
@@ -20,7 +21,7 @@ log = logging.getLogger(__name__)
 class BagManifestItemSerializer(serializers.Serializer):
     """Same as the Manifest Item Serializer but missing the 'dest' field,
     which is not supported by the BDBag spec."""
-    source_ref = ManifestURL()
+    source_ref = GlobusURL()
     checksum = ManifestChecksumSerializer()
 
     required = ['source_ref', 'checksum']
