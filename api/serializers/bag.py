@@ -61,7 +61,10 @@ class RemoteFileManifestEntrySerializer(serializers.Serializer):
         return data
 
 
-class BagSerializer(serializers.HyperlinkedModelSerializer):
+class BagCreateListSerializer(serializers.HyperlinkedModelSerializer):
+    """Older serializer used to serialize bags. This object isn't well
+    normalized, and the next version will shift to using the separate
+    serializers below."""
 
     minid = serializers.CharField(max_length=255, read_only=True)
     user = serializers.ReadOnlyField(source='user.username')
@@ -199,3 +202,31 @@ class StageBagSerializer(serializers.HyperlinkedModelSerializer):
             log.debug(te)
             raise GlobusTransferException(detail={'error': te.message,
                                           'code': te.code})
+
+
+class MinidSerializer(serializers.Serializer):
+    metadata = serializers.JSONField(required=False)
+    test = serializers.BooleanField(required=False,
+                                    default=settings.DEFAULT_TEST_MINIDS)
+    identifier = serializers.CharField(max_length=255, read_only=True)
+    location = serializers.ListField(child=serializers.CharField(),
+                                     read_only=True)
+
+
+class BagMetadataSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+    name = serializers.CharField(allow_blank=True, max_length=128,
+                                 required=False)
+    minid = MinidSerializer()
+    metadata = serializers.JSONField(required=False, write_only=True)
+    ro_metadata = serializers.JSONField(required=False, write_only=True)
+
+    class Meta:
+        model = Bag
+        fields = ('id', 'user', 'name', 'minid', 'metadata', 'ro_metadata')
+
+
+class BagSerializer(BagMetadataSerializer):
+    remote_file_manifest = RemoteFileManifestEntrySerializer(
+        required=True, many=True, write_only=True
+    )

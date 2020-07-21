@@ -41,7 +41,7 @@ class ConciergeToken(models.Model):
 
     @property
     def token_expired(self):
-        log.debug(f'Token expires in {self.token_expires - time.time} secs')
+        log.debug(f'Token expires in {self.expires_at - time.time()} secs')
         return time.time() > self.expires_at
 
     def get_cached_dependent_tokens(self):
@@ -123,3 +123,19 @@ class StageBag(models.Model):
         if any(filter(lambda stat: stat == 'ACTIVE', statuses)):
             return 'ACTIVE'
         return 'SUCCEEDED'
+
+
+class Transfer(models.Model):
+    user = models.ForeignKey(User, related_name='transfers',
+                             on_delete=models.CASCADE)
+    submission_id = models.UUIDField()
+    task_id = models.UUIDField()
+    start_time = models.DateTimeField(auto_now_add=True)
+    completion_time = models.DateTimeField(null=True)
+    status = models.CharField(max_length=32)
+
+
+class TransferManifest(models.Model):
+    user = models.ForeignKey(User, related_name='manifests',
+                             on_delete=models.CASCADE)
+    transfer = models.ForeignKey(Transfer, on_delete=models.CASCADE)

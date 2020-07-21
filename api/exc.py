@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 import logging
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework import status
 
 log = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ class ConciergeException(APIException):
     default_status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def __init__(self, *args, **kwargs):
-        super(ConciergeException, self).__init__(*args, **kwargs)
+        super().__init__(*args)
         self.code = kwargs.get('code', self.default_code)
         self.status_code = kwargs.get('status_code', self.default_status_code)
         self.detail = args[0] if args else self.default_detail
@@ -44,3 +44,11 @@ class InsufficientScopesException(ConciergeException):
     default_detail = 'The user attempted an action which was not authorized ' \
                      'for the token used in this request'
     default_code = 'insufficient_scopes'
+
+
+class TokenInactive(AuthenticationFailed):
+    pass
+
+
+class TokenExpired(TokenInactive):
+    pass

@@ -3,13 +3,7 @@ import os
 FILES_DIR = os.path.join(os.path.dirname(__file__), 'files')
 TEST_BAG = os.path.join(FILES_DIR, 'testbag.zip')
 
-MOCK_TOKENS = {
-    'identifiers.globus.org': {
-        'access_token': 'identifiers_access_token'
-    }
-}
-
-MOCK_IDENTIFIERS_GET_RESPONSE = {
+MINID_RESPONSE = {
   "admins": [
     "urn:globus:auth:identity:37c89679-d62b-4ff8-a24f-80bbfe7eed57",
     "urn:globus:auth:identity:4846deda-625e-4456-9c84-1647e53d71e1",

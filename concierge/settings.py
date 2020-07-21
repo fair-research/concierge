@@ -49,6 +49,9 @@ SUPPORTED_STAGING_PROTOCOLS = ['globus']
 SUPPORTED_BAG_PROTOCOLS = ['http', 'https', 'globus']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
+with open(os.path.join(BASE_DIR, 'service_description.md')) as f:
+    SERVICE_DESCRIPTION = f.read()
+
 CONCIERGE_SCOPE = ('https://auth.globus.org/scopes/'
                    '524361f2-e4a9-4bd0-a3a6-03e365cac8a9/concierge')
 MINID_SCOPE = ('https://auth.globus.org/scopes/identifiers.fair-research.org/'
