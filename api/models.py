@@ -75,7 +75,7 @@ class ConciergeToken(models.Model):
     @classmethod
     def from_user(cls, user):
         tokens = [t for t in cls.objects.filter(user=user)
-                  if not t.token_expired()]
+                  if not t.token_expired]
         if tokens:
             return tokens[0]
 
