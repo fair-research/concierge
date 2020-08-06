@@ -6,8 +6,9 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from api.views import (
     BagViewSet, StageBagViewSet, logout, BagManifestViewSet,
-    TransferManifestViewSet,
+    TransferManifestViewSet
 )
+from gap.urls import AutomateRouter, TransferManifestRouter
 
 router = routers.DefaultRouter()
 
@@ -31,6 +32,7 @@ schema_view = get_schema_view(
 # Inlcude the schema view in our urls.
 urlpatterns = [
     path('api/', include(router.urls)),
+    path('api/automate/manifest/', include(TransferManifestRouter().urls)),
     path('api/bag_manifest/', BagManifestViewSet.as_view({'post': 'create'})),
     path('schema.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('', schema_view.with_ui('swagger', cache_timeout=0),

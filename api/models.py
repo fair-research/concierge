@@ -139,3 +139,5 @@ class TransferManifest(models.Model):
     user = models.ForeignKey(User, related_name='manifests',
                              on_delete=models.CASCADE)
     transfer = models.ForeignKey(Transfer, on_delete=models.CASCADE)
+    action = models.ForeignKey('gap.Action', models.SET_NULL,
+                               blank=True, null=True,)

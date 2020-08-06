@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'social_django',  # django social auth
     'drf_yasg',
     'api',
+    'gap',
 ]
 
 REST_FRAMEWORK = {
@@ -190,6 +191,11 @@ LOGGING = {
             'propagate': True,
         },
         'concierge': {
+            'handlers': ['stream'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'gap': {
             'handlers': ['stream'],
             'level': 'DEBUG',
             'propagate': True,
