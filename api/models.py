@@ -6,6 +6,7 @@ from functools import reduce
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
+import api.manifest
 
 import api
 
@@ -16,9 +17,7 @@ class ConciergeToken(models.Model):
 
     ID_SCOPE = 'identifiers.globus.org'
     SCOPE_PERMISSIONS = {
-        settings.CONCIERGE_SCOPE: [
-            settings.MINID_SCOPE, settings.TRANSFER_SCOPE,
-        ]
+        settings.CONCIERGE_SCOPE: [settings.TRANSFER_SCOPE]
     }
 
     id = models.CharField(max_length=128, primary_key=True)
@@ -80,11 +79,20 @@ class ConciergeToken(models.Model):
             return tokens[0]
 
 
-class Bag(models.Model):
+class Manifest(models.Model):
     user = models.ForeignKey(User, related_name='bags',
                              on_delete=models.CASCADE)
-    minid = models.CharField(max_length=30)
-    location = models.CharField(max_length=255)
+    # minid = models.CharField(max_length=30)
+    # name = models.CharField(max_length=255)
+    location = models.CharField(max_length=255, null=True)
+
+    @property
+    def manifest_items(self):
+        return api.manifest.get_globus_manifest(self.id)
+
+    @property
+    def remote_file_manifest(self):
+        return api.manifest.get_remote_file_manifest(self.id)
 
 
 class StageBag(models.Model):

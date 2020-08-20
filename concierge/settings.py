@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/1.11/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.11/ref/settings/
 """
-from __future__ import unicode_literals
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -31,22 +30,19 @@ ALLOWED_HOSTS = []
 AWS_ACCESS_KEY_ID = ""
 AWS_SECRET_ACCESS_KEY = ""
 AWS_BUCKET_NAME = "fair-research-concierge"
-AWS_FOLDER = 'bags'
+AWS_FOLDER = 'manifests'
+AWS_FOLDER_TEST = 'manifests-dev'
+AWS_STAGING_DIR = '/tmp/concierge_staging'
 
 # Globus
 GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'
 
-# Minid Server
-MINID_SERVER = "https://portal.sc17.nick.globuscs.info/minid"
-MINID_TEST = False
-
 # Bag Settings
 BAG_STAGING_DIR = '/tmp/bag_staging'
-BAG_ARCHIVE_FORMAT = 'zip'
 
 # Other
-SUPPORTED_STAGING_PROTOCOLS = ['globus']
 SUPPORTED_BAG_PROTOCOLS = ['http', 'https', 'globus']
+SUPPORTED_CHECKSUMS = ['md5', 'sha1', 'sha256', 'sha512']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
 with open(os.path.join(BASE_DIR, 'service_description.md')) as f:
@@ -54,8 +50,6 @@ with open(os.path.join(BASE_DIR, 'service_description.md')) as f:
 
 CONCIERGE_SCOPE = ('https://auth.globus.org/scopes/'
                    '524361f2-e4a9-4bd0-a3a6-03e365cac8a9/concierge')
-MINID_SCOPE = ('https://auth.globus.org/scopes/identifiers.fair-research.org/'
-               'writer')
 TRANSFER_SCOPE = 'urn:globus:auth:scope:transfer.api.globus.org:all'
 
 GLOBUS_KEY = '***'
@@ -65,19 +59,15 @@ SOCIAL_AUTH_GLOBUS_SECRET = '***'
 SOCIAL_AUTH_GLOBUS_SCOPE = [CONCIERGE_SCOPE]
 
 SWAGGER_SETTINGS = {
-   'SECURITY_DEFINITIONS': {
-      'Bearer': {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
             'type': 'apiKey',
             'name': 'Authorization',
             'in': 'header'
-      }
-   }
+        }
+    },
+    'DEFAULT_INFO': 'concierge.urls.api',
 }
-
-# Id for creating minids
-TEST_IDENTIFIER_NAMESPACE = 'HHxPIZaVDh9u'
-IDENTIFIER_NAMESPACE = 'kHAAfCby2zdn'
-DEFAULT_TEST_MINIDS = True
 
 
 # Application definition
