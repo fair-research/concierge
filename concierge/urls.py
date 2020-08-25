@@ -23,7 +23,7 @@ schema_view = get_schema_view(
 
 manifests = [
     # List all manifests, agostic of type
-    path('', ManifestViewSet.as_view({'get': 'list'}), serializer_class=ManifestListSerializer),
+    path('', ManifestViewSet.as_view({'get': 'list'}, serializer_class=ManifestListSerializer)),
     # GET/CREATE as Gloubs Manifest
     path('globus_manifest/',
          ManifestViewSet.as_view({'post': 'create'}, serializer_class=GlobusManifestSerializer)),
@@ -34,11 +34,11 @@ manifests = [
          ManifestViewSet.as_view({'post': 'create'}, serializer_class=RemoteFileManifestSerializer)),
     path('<pk>/remote_file_manifest/',
          ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=RemoteFileManifestSerializer)),
-    path('<manifest_uuid>/transfer/', TransferViewSet.as_view({'post': 'create'}),),
-    path('<manifest_uuid>/transfer/<transfer_uuid>',
-         TransferViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer())),
-    path('transfer/',
-         TransferViewSet.as_view({'get': 'list'}, serializer_class=serializers.Serializer())),
+    # path('<manifest_uuid>/transfer/', TransferViewSet.as_view({'post': 'create'}),),
+    # path('<manifest_uuid>/transfer/<transfer_uuid>',
+    #      TransferViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer())),
+    # path('transfer/',
+    #      TransferViewSet.as_view({'get': 'list'}, serializer_class=serializers.Serializer())),
 ]
 
 # Include the schema view in our urls.

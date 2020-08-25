@@ -24,7 +24,7 @@ SECRET_KEY = 'Keep this secret in production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['concierge-cli.eba-hci6hkr3.us-east-2.elasticbeanstalk.com']
 
 # AWS access
 AWS_ACCESS_KEY_ID = ""
