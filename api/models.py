@@ -80,6 +80,7 @@ class ConciergeToken(models.Model):
 
 
 class Manifest(models.Model):
+    id = models.UUIDField(primary_key=True)
     user = models.ForeignKey(User, related_name='bags',
                              on_delete=models.CASCADE)
     # minid = models.CharField(max_length=30)
@@ -96,6 +97,7 @@ class Manifest(models.Model):
 
 
 class StageBag(models.Model):
+    id = models.UUIDField(primary_key=True)
     user = models.ForeignKey(User, related_name='stagebags',
                              on_delete=models.CASCADE)
     destination_endpoint = models.CharField(max_length=512)

@@ -8,7 +8,7 @@ from gap.views import ActionViewSet
 from gap.serializers import ActionSerializer
 from gap.models import Action
 from api.models import Manifest, TransferManifest
-from api.auth import GlobusSessionAuthentication
+from api.auth import GlobusSessionAuthentication, IsOwnerOrReadOnly, IsOwner
 from api.transfer import get_transfer_client
 
 from api.serializers.manifest import ManifestListSerializer
@@ -18,29 +18,29 @@ from api.serializers.automate import TransferManifestActionSerializer
 log = logging.getLogger(__name__)
 
 
-class ConciergeViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
-    http_method_names = ['get', 'post', 'head']
-
-
-class ManifestViewSet(ConciergeViewSet):
+class ManifestViewSet(viewsets.ModelViewSet):
     """
-    list: List previously created manifests
-    retrieve: Fetch and display the contents of a Manifest
-    create: Create a Manifest using the Globus Manifest spec
+    list: List all manifests.
+    retrieve: Fetch and display the contents of a Manifest. Allowed by anyone.
+    create: Create a Manifest using the Globus Manifest spec. Must be Authenticated.
+    delete: Delete a manifest. Only allowed by owner.
     """
     serializer_class = ManifestListSerializer
     queryset = Manifest.objects.all()
+    permission_classes = (IsOwnerOrReadOnly,)
+    http_method_names = ['head', 'get', 'post', 'delete']
 
 
-class TransferViewSet(ConciergeViewSet):
+class TransferViewSet(viewsets.ModelViewSet):
     """
     list: List all of a user's previously transferred manifests
     retrieve: Get the status for an existing manifest transfer
     create: Transfer a Manifest using an identifier or any previously created manifests (uuid)
     """
     serializer_class = TransferSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwner)
     queryset = TransferManifest.objects.all()
+    http_method_names = ['head', 'get', 'post']
 
 
 # class TransferManifestViewSet(viewsets.ModelViewSet):
@@ -72,12 +72,15 @@ class TransferManifestActionViewSet(ActionViewSet):
     Automate action for transferring a given manifest.
     https://globusonline.github.io/manifests/overview.html
 
-    run: Start a transfer for a Globus Manifest.
+    run: Start a transfer for a Globus Manifest. Will include a separate transfer for
+         each unique source endpoint in the manifest provided.
     list: List the current user's previous transfers
-    introspect: See the Schema
-    status: Get status for a Manifest Transfer
+    introspect: See the JSON Schema for transferring a manifest via a Globus Flow
+    status: Get status for a Manifest Transfer. Will remain ACTIVE until each transfer
+            has been completed. Returns SUCCEEDED if all transfers completed without
+            error and FAILED otherwise.
     release: Deletes the stored data for this action.
-    cancel: Stops the current action, if the action supports it.
+    cancel: Cancel all active transfers.
     """
     serializer_class = TransferManifestActionSerializer
 

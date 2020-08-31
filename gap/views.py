@@ -27,7 +27,7 @@ class ActionViewSet(viewsets.ModelViewSet):
     def urls(cls):
         return [
             path('', cls.as_view({'get': 'introspect'})),
-            path('list', cls.as_view({'get': 'list'})),
+            # path('list', cls.as_view({'get': 'list'})),
             path('run', cls.as_view({'post': 'run'})),
             path('<action_id>/status', cls.as_view({'get': 'status'})),
             path('<action_id>/cancel', cls.as_view({'post': 'cancel'}, serializer_class=serializers.Serializer)),

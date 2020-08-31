@@ -27,11 +27,11 @@ class RemoteFileManifestEntrySerializer(serializers.Serializer):
 
     SUPPORTED_CHECKSUMS = ['md5', 'sha256']
 
-    url = api.serializers.transfer.GlobusURL()
-    length = serializers.IntegerField()
-    filename = serializers.CharField(max_length=256)
-    md5 = serializers.CharField(max_length=32, required=False)
-    sha256 = serializers.CharField(max_length=64, required=False)
+    url = api.serializers.transfer.GlobusURL(help_text='URL to a file located on a Globus endpoint')
+    length = serializers.IntegerField(help_text='Length of the file')
+    filename = serializers.CharField(max_length=256, help_text='Filename of the file')
+    md5 = serializers.CharField(max_length=32, required=False, help_text='MD5 checksum of the file')
+    sha256 = serializers.CharField(max_length=64, required=False, help_text='SHA256 checksum of the file')
 
     def validate(self, data):
         if not any(data.get(f) for f in self.SUPPORTED_CHECKSUMS):
@@ -41,7 +41,8 @@ class RemoteFileManifestEntrySerializer(serializers.Serializer):
 
 
 class RemoteFileManifestSerializer(serializers.ModelSerializer):
-    remote_file_manifest = RemoteFileManifestEntrySerializer(many=True)
+    remote_file_manifest = RemoteFileManifestEntrySerializer(many=True, help_text='List of Remote File Manifest '
+                                                                                  'Entries')
 
     class Meta:
         fields = '__all__'
@@ -62,8 +63,9 @@ class GlobusManifestChecksumSerializer(serializers.Serializer):
 
 
 class GlobusManifestItemSerializer(serializers.Serializer):
-    source_ref = api.serializers.transfer.GlobusURL()
-    dest_path = serializers.CharField()
+    source_ref = api.serializers.transfer.GlobusURL(help_text='URL to a file or directory located on a Globus '
+                                                              'endpoint')
+    dest_path = serializers.CharField(help_text='Filename or dir path to name the "source_ref" resource on transfer')
     checksum = GlobusManifestChecksumSerializer(required=False)
 
 
