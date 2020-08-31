@@ -19,20 +19,20 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'Keep this secret in production'
+SECRET_KEY = os.getenv('SECRET_KEY', 'set this to be something secret in production!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.getenv('DEBUG', False)
 
-ALLOWED_HOSTS = ['concierge-cli.eba-hci6hkr3.us-east-2.elasticbeanstalk.com']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', [])
 
 # AWS access
-AWS_ACCESS_KEY_ID = ""
-AWS_SECRET_ACCESS_KEY = ""
-AWS_BUCKET_NAME = "fair-research-concierge"
-AWS_FOLDER = 'manifests'
-AWS_FOLDER_TEST = 'manifests-dev'
-AWS_STAGING_DIR = '/tmp/concierge_staging'
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+AWS_BUCKET_NAME = os.getenv('AWS_BUCKET_NAME', 'fair-research-concierge')
+AWS_FOLDER = os.getenv('AWS_FOLDER', 'manifests')
+AWS_FOLDER_TEST = os.getenv('AWS_FOLDER_TEST', 'manifests-dev')
+AWS_STAGING_DIR = os.getenv('AWS_STAGING_DIR', '/tmp/concierge_staging')
 
 # Globus
 GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'
@@ -52,10 +52,10 @@ CONCIERGE_SCOPE = ('https://auth.globus.org/scopes/'
                    '524361f2-e4a9-4bd0-a3a6-03e365cac8a9/concierge')
 TRANSFER_SCOPE = 'urn:globus:auth:scope:transfer.api.globus.org:all'
 
-GLOBUS_KEY = '***'
-GLOBUS_SECRET = '***'
-SOCIAL_AUTH_GLOBUS_KEY = '***'
-SOCIAL_AUTH_GLOBUS_SECRET = '***'
+GLOBUS_KEY = os.getenv('GLOBUS_KEY', '')
+GLOBUS_SECRET = os.getenv('GLOBUS_SECRET', '')
+SOCIAL_AUTH_GLOBUS_KEY = GLOBUS_KEY
+SOCIAL_AUTH_GLOBUS_SECRET = GLOBUS_SECRET
 SOCIAL_AUTH_GLOBUS_SCOPE = [CONCIERGE_SCOPE]
 
 SWAGGER_SETTINGS = {
@@ -136,7 +136,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'wsgi.app'
+WSGI_APPLICATION = 'application.application'
 
 
 # Database
@@ -212,6 +212,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.getenv('STATIC_ROOT', 'static')
 
 try:
     from concierge.local_settings import *  # NOQA

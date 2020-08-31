@@ -1,13 +1,13 @@
 branch-defaults:
   automate:
-    environment: concierge-cli
+    environment: concierge-env
     group_suffix: null
 environment-defaults:
   concierge-env:
     branch: null
     repository: null
 global:
-  application_name: concirege
+  application_name: concierge-service
   branch: null
   default_ec2_keyname: aws-eb
   default_platform: Python 3.7
@@ -20,6 +20,3 @@ global:
   repository: null
   sc: git
   workspace_type: Application
-option_settings:
-  aws:elasticbeanstalk:container:python:
-    WSGIPath: wsgi.py:app
