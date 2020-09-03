@@ -21,7 +21,9 @@ log = logging.getLogger(__name__)
 class ManifestViewSet(viewsets.ModelViewSet):
     """
     list: List all manifests.
-    retrieve: Fetch and display the contents of a Manifest. Allowed by anyone.
+    retrieve: Fetch and display the contents of a Manifest. Allowed by anyone. \
+    Supports query param ``format`` with valid values ``globus_manifest``, ``remote_file_manifest`` \
+    or ``bdbag``.
     create: Create a Manifest using the Globus Manifest spec. Must be Authenticated.
     delete: Delete a manifest. Only allowed by owner.
     """
