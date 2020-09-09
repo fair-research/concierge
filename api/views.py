@@ -7,13 +7,13 @@ from rest_framework.request import Request
 from gap.views import ActionViewSet
 from gap.serializers import ActionSerializer
 from gap.models import Action
-from api.models import Manifest, TransferManifest
+from api.models import Manifest, ManifestTransfer
 from api.auth import GlobusSessionAuthentication, IsOwnerOrReadOnly, IsOwner
 from api.transfer import get_transfer_client
 
-from api.serializers.manifest import ManifestListSerializer
+from api.serializers.manifest import ManifestListSerializer, ManifestTransferSerializer
 from api.serializers.transfer import TransferSerializer
-from api.serializers.automate import TransferManifestActionSerializer
+from api.serializers.automate import ManifestTransferActionSerializer, ManifestTransferActionStatusSerializer
 
 log = logging.getLogger(__name__)
 
@@ -39,9 +39,9 @@ class TransferViewSet(viewsets.ModelViewSet):
     retrieve: Get the status for an existing manifest transfer
     create: Transfer a Manifest using an identifier or any previously created manifests (uuid)
     """
-    serializer_class = TransferSerializer
+    serializer_class = ManifestTransferSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwner)
-    queryset = TransferManifest.objects.all()
+    queryset = ManifestTransfer.objects.all()
     http_method_names = ['head', 'get', 'post']
 
 
@@ -84,7 +84,9 @@ class TransferManifestActionViewSet(ActionViewSet):
     release: Deletes the stored data for this action.
     cancel: Cancel all active transfers.
     """
-    serializer_class = TransferManifestActionSerializer
+    serializer_class = ManifestTransferActionSerializer
+    create_serializer_class = ManifestTransferActionSerializer
+    status_serializer_class = ManifestTransferActionStatusSerializer
 
     def get_manifest(self, action=None, action_id=None):
         # log.debug(self.kwargs)
@@ -94,7 +96,7 @@ class TransferManifestActionViewSet(ActionViewSet):
             else:
                 action = Action.objects.get(action_id=action_id)
         log.debug(f'Fetching manifest with action action {action}')
-        return TransferManifest.objects.get(action=action)
+        return ManifestTransfer.objects.get(action=action)
 
     def cancel(self, request, action_id):
         obj = self.get_manifest(action_id)

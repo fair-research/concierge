@@ -221,6 +221,8 @@ def transfer_catalog(auth, transfer_manifest, dest_endpoint, dest_prefix,
                      label=None,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
+    # activate all endpoints before transfer
+    #
     tc = get_transfer_client(auth)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:

@@ -136,18 +136,20 @@ class StageBag(models.Model):
 
 
 class Transfer(models.Model):
+    task_id = models.UUIDField(primary_key=True)
     user = models.ForeignKey(User, related_name='transfers',
                              on_delete=models.CASCADE)
     submission_id = models.UUIDField()
-    task_id = models.UUIDField()
     start_time = models.DateTimeField(auto_now_add=True)
     completion_time = models.DateTimeField(null=True)
     status = models.CharField(max_length=32)
 
 
-class TransferManifest(models.Model):
+class ManifestTransfer(models.Model):
+    id = models.UUIDField(primary_key=True)
     user = models.ForeignKey(User, related_name='manifests',
                              on_delete=models.CASCADE)
-    transfer = models.ForeignKey(Transfer, on_delete=models.CASCADE)
+    manifest = models.ForeignKey(Manifest, blank=True, null=True, on_delete=models.CASCADE)
+    transfers = models.ManyToManyField(Transfer)
     action = models.ForeignKey('gap.Action', models.SET_NULL,
                                blank=True, null=True,)

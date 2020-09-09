@@ -20,6 +20,7 @@ class ManifestListSerializer(serializers.ModelSerializer):
 
     class Meta:
         fields = '__all__'
+        depth = 0
         model = api.models.Manifest
 
 
@@ -77,7 +78,7 @@ class GlobusManifestSerializer(serializers.ModelSerializer):
     class Meta:
         fields = '__all__'
         model = api.models.Manifest
-        read_only_fields = ['user', 'location']
+        read_only_fields = ['id', 'user', 'location']
 
     def create(self, validated_data):
         rfm = api.manifest.gm_to_rfm(validated_data['manifest_items'])
@@ -97,25 +98,27 @@ class GlobusManifestSerializer(serializers.ModelSerializer):
     #     return data
 
 
-# class TransferManifestSerializer(serializers.ModelSerializer):
-#     manifest = ManifestSerializer(write_only=True)
-#     user = serializers.ReadOnlyField(source='user.username')
-#
-#     class Meta:
-#         model = api.models.TransferManifest
-#         fields = ('id', 'user', 'manifest', 'transfer')
-#         read_only_fields = ['transfer']
-#         depth = 1
-#
-#     def create(self, validated_data):
-#         auth = self.context['request'].auth
-#         manifest = validated_data['manifest']
-#         transfer = api.transfer.transfer_manifest(auth, manifest)
-#         tinfo = {i: transfer.get(i) for i in ['submission_id', 'task_id']}
-#         tinfo['status'] = transfer['code']
-#         tinfo['user'] = auth.user
-#
-#         transfer_model = api.models.Transfer(**tinfo)
-#         transfer_model.save()
-#         return api.models.TransferManifest.objects.create(
-#             user=auth.user, transfer=transfer_model)
+class ManifestTransferSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+    manifest = serializers.UUIDField(help_text='UUID of the manifest you want to transfer')
+    destination = api.serializers.transfer.GlobusURL(
+        help_text='Globus endpoint and path destination to transfer manifest files.')
+
+    class Meta:
+        model = api.models.ManifestTransfer
+        exclude = ('action',)
+        read_only_fields = ['id', 'user', 'transfers']
+        depth = 1
+
+    def create(self, validated_data):
+        auth = self.context['request'].auth
+        manifest = validated_data['manifest']
+        transfer = api.transfer.transfer_manifest(auth, manifest)
+        tinfo = {i: transfer.get(i) for i in ['submission_id', 'task_id']}
+        tinfo['status'] = transfer['code']
+        tinfo['user'] = auth.user
+
+        transfer_model = api.models.Transfer(**tinfo)
+        transfer_model.save()
+        return api.models.TransferManifest.objects.create(
+            user=auth.user, transfer=transfer_model)

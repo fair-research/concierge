@@ -3,7 +3,7 @@ from django.urls import path
 from rest_framework import viewsets, permissions, serializers
 from rest_framework.response import Response
 from gap.models import Action
-from gap.serializers import ActionSerializer
+from gap.serializers import ActionSerializer, ActionCreateSerializer, ActionStatusSerializer
 
 log = logging.getLogger(__name__)
 
@@ -22,14 +22,16 @@ class ActionViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'head']
     queryset = Action.objects.all()
     lookup_field = 'action_id'
+    create_serializer_class = ActionCreateSerializer
+    status_serializer_class = ActionStatusSerializer
 
     @classmethod
     def urls(cls):
         return [
-            path('', cls.as_view({'get': 'introspect'})),
+            path('', cls.as_view({'get': 'introspect'}, serializer_class=serializers.Serializer)),
             # path('list', cls.as_view({'get': 'list'})),
-            path('run', cls.as_view({'post': 'run'})),
-            path('<action_id>/status', cls.as_view({'get': 'status'})),
+            path('run', cls.as_view({'post': 'run'}, serializer_class=cls.create_serializer_class)),
+            path('<action_id>/status', cls.as_view({'get': 'status'}, serializer_class=cls.status_serializer_class)),
             path('<action_id>/cancel', cls.as_view({'post': 'cancel'}, serializer_class=serializers.Serializer)),
             path('<action_id>/release', cls.as_view({'post': 'release'}, serializer_class=serializers.Serializer)),
         ]

@@ -5,7 +5,10 @@ from rest_framework import permissions, serializers
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from api.views import logout, ManifestViewSet, TransferViewSet, TransferManifestActionViewSet
-from api.serializers.manifest import GlobusManifestSerializer, RemoteFileManifestSerializer, ManifestListSerializer
+from api.serializers.manifest import (
+    GlobusManifestSerializer, RemoteFileManifestSerializer, ManifestListSerializer,
+    ManifestTransferSerializer,
+)
 
 api = openapi.Info(
     title="Concierge Service API",
@@ -39,11 +42,12 @@ manifests = [
     #      ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=RemoteFileManifestSerializer)),
     # path('<pk>/bdbag/',
     #      ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer)),
-    path('<manifest_uuid>/transfer/', TransferViewSet.as_view({'post': 'create'}),),
+    path('<manifest_uuid>/transfer/',
+         TransferViewSet.as_view({'post': 'create'}, serializer_class=ManifestTransferSerializer)),
     path('<manifest_uuid>/transfer/<transfer_manifest_uuid>/',
-         TransferViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer)),
+         TransferViewSet.as_view({'get': 'retrieve'}, serializer_class=ManifestTransferSerializer)),
     path('transfer/',
-         TransferViewSet.as_view({'get': 'list'}, serializer_class=serializers.Serializer)),
+         TransferViewSet.as_view({'get': 'list'}, serializer_class=ManifestTransferSerializer)),
 ]
 
 # Include the schema view in our urls.
