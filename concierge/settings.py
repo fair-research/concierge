@@ -25,7 +25,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'set this to be something secret in product
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', False)
 
-ALLOWED_HOSTS = json.loads(os.getenv('ALLOWED_HOSTS', '[]'))
+ALLOWED_HOST = os.getenv('ALLOWED_HOST')
+ALLOWED_HOSTS = [ALLOWED_HOST] if ALLOWED_HOST else []
 
 # AWS access
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
