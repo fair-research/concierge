@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.getenv('SECRET_KEY', 'set this to be something secret in production!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', False)
+DEBUG = True if os.getenv('DEBUG') == 'True' else False
 
 ALLOWED_HOST = os.getenv('ALLOWED_HOST')
 ALLOWED_HOSTS = [ALLOWED_HOST] if ALLOWED_HOST else []
