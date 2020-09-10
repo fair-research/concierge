@@ -1,8 +1,7 @@
-from __future__ import unicode_literals
 import logging
 import json
 import time
-from functools import reduce
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -80,12 +79,9 @@ class ConciergeToken(models.Model):
 
 
 class Manifest(models.Model):
-    id = models.UUIDField(primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, related_name='bags',
                              on_delete=models.CASCADE)
-    # minid = models.CharField(max_length=30)
-    # name = models.CharField(max_length=255)
-    location = models.CharField(max_length=255, null=True)
 
     @property
     def manifest_items(self):
@@ -95,44 +91,44 @@ class Manifest(models.Model):
     def remote_file_manifest(self):
         return api.manifest.get_remote_file_manifest(self.id)
 
-
-class StageBag(models.Model):
-    id = models.UUIDField(primary_key=True)
-    user = models.ForeignKey(User, related_name='stagebags',
-                             on_delete=models.CASCADE)
-    destination_endpoint = models.CharField(max_length=512)
-    destination_path_prefix = models.CharField(max_length=255, blank=True)
-    minids = models.TextField()
-    transfer_catalog = models.TextField()
-    task_catalog = models.TextField()
-    files_transferred = models.IntegerField(blank=True, null=True)
-    status = models.CharField()
-    error_catalog = models.TextField()
-    transfer_task_ids = models.TextField()
-
-    @property
-    def status(self):
-        ctoken = ConciergeToken.from_user(self.user)
-        tc = api.utils.load_transfer_client(ctoken)
-        old = json.loads(self.task_catalog or '{}')
-        tasks = {t: tc.get_task(t).data
-                 for t in json.loads(self.transfer_task_ids)
-                 if not old.get(t) or old[t]['status'] == 'ACTIVE'}
-        old.update(tasks)
-        tasks = old
-
-        transferred = [t['files_transferred'] for t in tasks.values()]
-        log.debug(transferred)
-        self.files_transferred = reduce(lambda x, y: x + y, transferred)
-        log.debug(self.files_transferred)
-        self.task_catalog = json.dumps(tasks)
-        self.save()
-        statuses = [s['status'] for s in tasks.values()]
-        if any(filter(lambda stat: stat in ['INACTIVE', 'FAILED'], statuses)):
-            return 'FAILED'
-        if any(filter(lambda stat: stat == 'ACTIVE', statuses)):
-            return 'ACTIVE'
-        return 'SUCCEEDED'
+#
+# class StageBag(models.Model):
+#     id = models.UUIDField(primary_key=True)
+#     user = models.ForeignKey(User, related_name='stagebags',
+#                              on_delete=models.CASCADE)
+#     destination_endpoint = models.CharField(max_length=512)
+#     destination_path_prefix = models.CharField(max_length=255, blank=True)
+#     minids = models.TextField()
+#     transfer_catalog = models.TextField()
+#     task_catalog = models.TextField()
+#     files_transferred = models.IntegerField(blank=True, null=True)
+#     status = models.CharField()
+#     error_catalog = models.TextField()
+#     transfer_task_ids = models.TextField()
+#
+#     @property
+#     def status(self):
+#         ctoken = ConciergeToken.from_user(self.user)
+#         tc = api.utils.load_transfer_client(ctoken)
+#         old = json.loads(self.task_catalog or '{}')
+#         tasks = {t: tc.get_task(t).data
+#                  for t in json.loads(self.transfer_task_ids)
+#                  if not old.get(t) or old[t]['status'] == 'ACTIVE'}
+#         old.update(tasks)
+#         tasks = old
+#
+#         transferred = [t['files_transferred'] for t in tasks.values()]
+#         log.debug(transferred)
+#         self.files_transferred = reduce(lambda x, y: x + y, transferred)
+#         log.debug(self.files_transferred)
+#         self.task_catalog = json.dumps(tasks)
+#         self.save()
+#         statuses = [s['status'] for s in tasks.values()]
+#         if any(filter(lambda stat: stat in ['INACTIVE', 'FAILED'], statuses)):
+#             return 'FAILED'
+#         if any(filter(lambda stat: stat == 'ACTIVE', statuses)):
+#             return 'ACTIVE'
+#         return 'SUCCEEDED'
 
 
 class Transfer(models.Model):

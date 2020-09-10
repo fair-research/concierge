@@ -94,7 +94,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         # Anonymous users are welcome to the base API
     ],
-    'EXCEPTION_HANDLER': 'api.exception_handlers.concierge_exception_handler'
+    'EXCEPTION_HANDLER': 'api.exception_handlers.concierge_exception_handler',
 }
 
 AUTHENTICATION_BACKENDS = (

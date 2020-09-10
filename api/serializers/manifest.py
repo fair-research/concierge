@@ -18,10 +18,12 @@ log = logging.getLogger(__name__)
 
 class ManifestListSerializer(serializers.ModelSerializer):
 
+    user = serializers.ReadOnlyField(source='user.username')
+
     class Meta:
-        fields = '__all__'
-        depth = 0
+        fields = ('id', 'user')
         model = api.models.Manifest
+        read_only_fields = ['id', 'user']
 
 
 class RemoteFileManifestEntrySerializer(serializers.Serializer):
@@ -42,12 +44,13 @@ class RemoteFileManifestEntrySerializer(serializers.Serializer):
 
 
 class RemoteFileManifestSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
     remote_file_manifest = RemoteFileManifestEntrySerializer(many=True, help_text='List of Remote File Manifest '
                                                                                   'Entries')
 
     class Meta:
         fields = '__all__'
-        read_only_fields = ['user', 'location']
+        read_only_fields = ['user']
         model = api.models.Manifest
 
     def create(self, validated_data):
@@ -73,17 +76,19 @@ class GlobusManifestItemSerializer(serializers.Serializer):
 class GlobusManifestSerializer(serializers.ModelSerializer):
 
     manifest_items = GlobusManifestItemSerializer(many=True)
-    # destination = api.serializers.transfer.GlobusURL()
+    user = serializers.ReadOnlyField(source='user.username')
 
     class Meta:
-        fields = '__all__'
+        fields = ('id', 'user', 'manifest_items')
         model = api.models.Manifest
-        read_only_fields = ['id', 'user', 'location']
+        read_only_fields = ['id', 'user']
 
     def create(self, validated_data):
         rfm = api.manifest.gm_to_rfm(validated_data['manifest_items'])
         model = api.models.Manifest.objects.create(user=self.context['request'].user)
-        api.manifest.upload_remote_file_manifest(model.id, rfm)
+        location = api.manifest.upload_remote_file_manifest(model.id, rfm)
+        model.location = location
+        model.save()
         # Since validated_data already contains the RFM,
         validated_data.update(dict(user=model.user, id=model.id))
         return validated_data
@@ -100,17 +105,20 @@ class GlobusManifestSerializer(serializers.ModelSerializer):
 
 class ManifestTransferSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
-    manifest = serializers.UUIDField(help_text='UUID of the manifest you want to transfer')
+    # manifest = serializers.UUIDField(help_text='UUID of the manifest you want to transfer')
     destination = api.serializers.transfer.GlobusURL(
         help_text='Globus endpoint and path destination to transfer manifest files.')
+    error = serializers.CharField(read_only=True)
 
     class Meta:
         model = api.models.ManifestTransfer
         exclude = ('action',)
-        read_only_fields = ['id', 'user', 'transfers']
+        read_only_fields = ['id', 'user', 'transfers', 'error']
         depth = 1
 
     def create(self, validated_data):
+        validated_data['error'] = 'This is not implemented! Check back soon!'
+        return validated_data
         auth = self.context['request'].auth
         manifest = validated_data['manifest']
         transfer = api.transfer.transfer_manifest(auth, manifest)

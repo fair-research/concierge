@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from django.urls import path, include
 from django.conf import settings
 from rest_framework import permissions, serializers
+from rest_framework.urlpatterns import format_suffix_patterns
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from api.views import logout, ManifestViewSet, TransferViewSet, TransferManifestActionViewSet
@@ -24,22 +25,27 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+manifest_detail_urls = [
+    path('<pk>/', ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer)),
+]
+
 manifests = [
     # List all manifests, agostic of type
+    # path('', include(format_suffix_patterns(manifest_detail_urls, allowed=['json', 'html']))),
     path('', ManifestViewSet.as_view({'get': 'list'}, serializer_class=ManifestListSerializer)),
     # GET/CREATE as Gloubs Manifest
     path('globus_manifest/',
          ManifestViewSet.as_view({'post': 'create'}, serializer_class=GlobusManifestSerializer)),
     path('<pk>/', ManifestViewSet.as_view({'get': 'retrieve',
-                                           'delete': 'delete'}, serializer_class=serializers.Serializer)),
+                                           'delete': 'delete'}, serializer_class=GlobusManifestSerializer)),
     # path('<pk>/', ManifestViewSet.as_view({'delete': 'delete'}, serializer_class=serializers.Serializer)),
-    # path('<pk>/globus_manifest/',
-    #      ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=GlobusManifestSerializer)),
+    path('<pk>/globus_manifest/',
+         ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=GlobusManifestSerializer)),
     # GET/CREATE as remote file manifest
     path('remote_file_manifest/',
          ManifestViewSet.as_view({'post': 'create'}, serializer_class=RemoteFileManifestSerializer)),
-    # path('<pk>/remote_file_manifest/',
-    #      ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=RemoteFileManifestSerializer)),
+    path('<pk>/remote_file_manifest/',
+         ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=RemoteFileManifestSerializer)),
     # path('<pk>/bdbag/',
     #      ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer)),
     path('<manifest_uuid>/transfer/',
@@ -53,6 +59,7 @@ manifests = [
 # Include the schema view in our urls.
 urlpatterns = [
     path('api/manifest/', include(manifests)),
+
     path('api/automate/transfer/',
          include(TransferManifestActionViewSet.urls())),
     path('schema.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),

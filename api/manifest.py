@@ -108,7 +108,8 @@ def get_remote_file_manifest(key):
 
 def upload_remote_file_manifest(key, remote_file_manifest):
     data = {'remote_file_manifest': remote_file_manifest}
-    filename = os.path.join(settings.BAG_STAGING_DIR, str(key))
+    filename = os.path.join(settings.AWS_STAGING_DIR, str(key))
+    log.debug(f'Writing manifest to temp dir {filename}')
     with open(filename, 'w') as f:
         f.write(json.dumps(data))
     return api.s3.upload(filename)

@@ -12,7 +12,7 @@ from api.auth import GlobusSessionAuthentication, IsOwnerOrReadOnly, IsOwner
 from api.transfer import get_transfer_client
 
 from api.serializers.manifest import ManifestListSerializer, ManifestTransferSerializer
-from api.serializers.transfer import TransferSerializer
+# from api.serializers.transfer import TransferSerializer
 from api.serializers.automate import ManifestTransferActionSerializer, ManifestTransferActionStatusSerializer
 
 log = logging.getLogger(__name__)
@@ -31,6 +31,16 @@ class ManifestViewSet(viewsets.ModelViewSet):
     queryset = Manifest.objects.all()
     permission_classes = (IsOwnerOrReadOnly,)
     http_method_names = ['head', 'get', 'post', 'delete']
+    # filter_backends = [DjangoFilterBackend]
+    # filterset_fields = ['format',]
+    # lookup_fields = []
+
+    def retrieve(self, request, *args, **kwargs):
+        log.debug(request, args, kwargs)
+        return super().retrieve(request, *args, **kwargs)
+
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
 
 class TransferViewSet(viewsets.ModelViewSet):

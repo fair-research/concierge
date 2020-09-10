@@ -1,6 +1,6 @@
 branch-defaults:
   automate:
-    environment: concierge-env
+    environment: concierge-env-2
     group_suffix: null
 environment-defaults:
   concierge-env:
