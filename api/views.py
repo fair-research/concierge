@@ -31,9 +31,6 @@ class ManifestViewSet(viewsets.ModelViewSet):
     queryset = Manifest.objects.all()
     permission_classes = (IsOwnerOrReadOnly,)
     http_method_names = ['head', 'get', 'post', 'delete']
-    # filter_backends = [DjangoFilterBackend]
-    # filterset_fields = ['format',]
-    # lookup_fields = []
 
     def retrieve(self, request, *args, **kwargs):
         log.debug(request, args, kwargs)

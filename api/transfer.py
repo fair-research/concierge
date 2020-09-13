@@ -1,6 +1,7 @@
 import os
 import logging
 from django.conf import settings
+from collections import defaultdict
 import globus_sdk
 
 from api.exc import GlobusTransferException
@@ -30,8 +31,8 @@ def submit_transfer(auth, source_endpoint, destination_endpoint, data,
     """
     try:
         tc = get_transfer_client(auth)
-        tc.endpoint_autoactivate(source_endpoint)
-        tc.endpoint_autoactivate(destination_endpoint)
+        # tc.endpoint_autoactivate(source_endpoint)
+        # tc.endpoint_autoactivate(destination_endpoint)
         tdata = globus_sdk.TransferData(tc, source_endpoint,
                                         destination_endpoint, **kwargs)
         for src, dest, is_dir, algorithm, checksum in data:
@@ -52,7 +53,7 @@ def submit_transfer(auth, source_endpoint, destination_endpoint, data,
                                       status_code=status_code, code=tapie.code)
 
 
-def transfer_manifest(auth, globus_manifest):
+def transfer_manifest(auth, globus_manifest, destination):
     """
     Submit a validated Globus Manifest. This is intended to be called via
     a serializer after validation has been completed.
@@ -60,19 +61,52 @@ def transfer_manifest(auth, globus_manifest):
     :param globus_manifest: api.serializers.manifest.ManifestSerializer
     :return:
     """
+    transfer_kwargs = {}
     manifest_items = globus_manifest['manifest_items']
-    source_endpoint = manifest_items[0]['source_ref']['endpoint']
-    destination_endpoint = globus_manifest['destination']['endpoint']
-    dest_prefix = globus_manifest['destination']['path']
-    transfer_data = []
+
+    # Activate all endpoints. There may be many source endpoints
+    source_eps = {m['source_ref']['endpoint'] for m in manifest_items}
+    tc = get_transfer_client(auth)
+    for ep in list(source_eps) + [destination['endpoint']]:
+        log.debug(f'Auto-activating Globus endpoint: {ep}')
+        # tc.endpoint_autoactivate(ep)
+
+    # Collect all files and start the transfer
+    transfer_data = dict()
     for item in manifest_items:
+        endpoint = item['source_ref']['endpoint']
+        if not transfer_data.get(endpoint):
+            transfer_data[endpoint] = globus_sdk.TransferData(
+                tc, endpoint, destination['endpoint'], **transfer_kwargs
+            )
         src = item['source_ref']['path']
-        dest = os.path.join(dest_prefix, item['dest_path'])
+        dest = os.path.join(destination['path'], item['dest_path'])
         is_dir = src.endswith('/')
-        checksum = item.get('checksum', {})
-        alg = checksum.get('algorithm')
-        checksum_value = checksum.get('value')
-        transfer_data.append((src, dest, is_dir, alg, checksum_value))
-    return submit_transfer(auth, source_endpoint,
-                           destination_endpoint,
-                           transfer_data)
+        if is_dir:
+            transfer_data[endpoint].add_item(src, dest, recursive=True)
+        elif item.get('checksum'):
+            log.debug(item['checksum'])
+            transfer_data[endpoint].add_item(src, dest,
+                                             external_checksum=item['checksum']['value'],
+                                             checksum_algorithm=item['checksum']['algorithm'])
+        else:
+            transfer_data[endpoint].add_item(src, dest)
+
+    transfers = []
+    for transfer_data in transfer_data.values():
+        try:
+            log.debug('Submitting Transfer')
+            transfers.append(tc.submit_transfer(transfer_data).data)
+        except globus_sdk.exc.TransferAPIError as tapie:
+            # Service Unavailable (503) if Globus Screws up, otherwise assume
+            # the user screwed up with a 400
+            status_code = 503 if tapie.http_status >= 500 else 400
+            if status_code == 503:
+                log.critical('Upstream Globus Transfer error!')
+                log.exception(tapie)
+            raise GlobusTransferException(tapie.message,
+                                          status_code=status_code, code=tapie.code)
+    log.debug('All transfers submitted successfully')
+    return transfers
+
+

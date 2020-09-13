@@ -105,28 +105,31 @@ class GlobusManifestSerializer(serializers.ModelSerializer):
 
 class ManifestTransferSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
-    # manifest = serializers.UUIDField(help_text='UUID of the manifest you want to transfer')
     destination = api.serializers.transfer.GlobusURL(
         help_text='Globus endpoint and path destination to transfer manifest files.')
-    error = serializers.CharField(read_only=True)
 
     class Meta:
         model = api.models.ManifestTransfer
         exclude = ('action',)
-        read_only_fields = ['id', 'user', 'transfers', 'error']
+        read_only_fields = ['id', 'user', 'transfers']
         depth = 1
 
     def create(self, validated_data):
-        validated_data['error'] = 'This is not implemented! Check back soon!'
-        return validated_data
+        manifest_id = self.context['view'].kwargs['manifest_uuid']
+        manifest = api.models.Manifest.objects.get(id=manifest_id)
+        try:
+            rfm = RemoteFileManifestSerializer(manifest)
+            gm_data = api.manifest.rfm_to_gm(rfm.to_internal_value(rfm.data))
+        except Exception:
+            gm = GlobusManifestSerializer(manifest)
+            gm_data = gm.to_internal_value(gm.data)
         auth = self.context['request'].auth
-        manifest = validated_data['manifest']
-        transfer = api.transfer.transfer_manifest(auth, manifest)
+        transfer = api.transfer.transfer_manifest(auth, gm_data, validated_data['destination'])
         tinfo = {i: transfer.get(i) for i in ['submission_id', 'task_id']}
         tinfo['status'] = transfer['code']
         tinfo['user'] = auth.user
 
         transfer_model = api.models.Transfer(**tinfo)
         transfer_model.save()
-        return api.models.TransferManifest.objects.create(
+        return api.models.ManifestTransfer.objects.create(
             user=auth.user, transfer=transfer_model)
