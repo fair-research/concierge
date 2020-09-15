@@ -194,3 +194,4 @@ class ManifestTransfer(models.Model):
             return 'SUCCEEDED'
         if any([s == 'FAILED' for s in statuses]):
             return 'FAILED'
+        return 'ACTIVE'

@@ -75,9 +75,13 @@ def transfer_manifest(auth, globus_manifest, destination):
     # Activate all endpoints. There may be many source endpoints
     source_eps = {m['source_ref']['endpoint'] for m in manifest_items}
     tc = get_transfer_client(auth)
-    for ep in list(source_eps) + [destination['endpoint']]:
+    for ep in set(list(source_eps) + [destination['endpoint']]):
         log.debug(f'Auto-activating Globus endpoint: {ep}')
-        # tc.endpoint_autoactivate(ep)
+        try:
+            tc.endpoint_autoactivate(ep)
+        except globus_sdk.exc.TransferAPIError as tapie:
+            raise GlobusTransferException(f'Failed to auto-activate endpoint {ep}',
+                                          status_code=400, code=tapie.code)
 
     # Collect all files and start the transfer
     transfer_data = dict()
