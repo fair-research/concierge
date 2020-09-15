@@ -68,11 +68,161 @@ example:
 * resource - a URL addressable part of the API, which can be interacted with using a subset of the GET, POST, PUT, and DELETE HTTP methods.
 * document - a representation of data, returned by resources as output and accepted by resources as input. There are several standard document types, and some types include sub-documents.
 
-Document Formats
+### Document Formats
 
 The API uses json for all input and output, including error documents.
 
 Note that application/x-www-form-urlencoded is not supported. The body should contain the actual JSON data, not a form encoded version of that data.
 
-Supported resources / api endpoints with examples
-Below is a list of the supported resources or api endpoints with example calls. For brevity, the base url is omitted, for example https://manifests.globus.org. Also, the authentication header is also omitted in the request portion.
+## API Examples -- Creating and Transferring a Manifest
+
+The service API can be reached at https://develop.concierge.nick.globuscs.info/.
+
+#### POST /api/manifest/globus_manifest/
+
+* Creates a Globus Manifest, and returns a `manifest_id` which can be later queried and used for transfer.
+
+```
+{
+  "manifest_items": [
+    {
+      "source_ref": "globus://ddb59aef-6d04-11e5-ba46-22000b92c6ec/share/godata/file1.txt",
+      "dest_path": "tut_ep_1_file1.txt",
+      "checksum": {
+              "algorithm": "md5",
+              "value": "5bbf5a52328e7439ae6e719dfe712200"
+          }
+    },
+    {
+      "source_ref": "globus://ddb59af0-6d04-11e5-ba46-22000b92c6ec/share/godata/file1.txt",
+      "dest_path": "tut_ep_2_file1.txt"
+    }
+  ]
+}
+```
+
+Response:
+
+```
+201 Created
+Content-Type: application/json
+
+{
+  "manifest_id": "dc5e17d1-5cfd-48ad-8cdd-ee1eb0c72551",
+  "user": "nickolaussaint@globusid.org",
+  "manifest_items": [
+    {
+      "source_ref": "globus://ddb59aef-6d04-11e5-ba46-22000b92c6ec/share/godata/file1.txt",
+      "dest_path": "tut_ep_1_file1.txt",
+      "checksum": {
+        "algorithm": "md5",
+        "value": "5bbf5a52328e7439ae6e719dfe712200"
+      }
+    },
+    {
+      "source_ref": "globus://ddb59af0-6d04-11e5-ba46-22000b92c6ec/share/godata/file1.txt",
+      "dest_path": "tut_ep_2_file1.txt"
+    }
+  ]
+}
+```
+
+#### POST /api/manifest/{manifest_id}/transfer/
+
+* Transfer an existing `manifest_id` to a Globus Endpoint.
+
+```
+{
+  "destination": "globus://ddb59af0-6d04-11e5-ba46-22000b92c6ec/~/my_files"
+}
+```
+
+```
+201 Created
+Content-Type: application/json
+
+{
+  "manifest_id": "dc5e17d1-5cfd-48ad-8cdd-ee1eb0c72551",
+  "manifest_transfer_id": "72b22f76-fc5c-40bc-abd8-9d747158e0ef",
+  "user": "nickolaussaint@globusid.org",
+  "status": "ACTIVE",
+  "transfers": [
+    {
+      "task_id": "bb549bcc-f799-11ea-abce-0213fe609573",
+      "submission_id": "bb549bcd-f799-11ea-abce-0213fe609573",
+      "start_time": "2020-09-15T21:23:43.610782Z",
+      "completion_time": null,
+      "source_endpoint_id": "ddb59aef-6d04-11e5-ba46-22000b92c6ec",
+      "source_endpoint_display_name": "Globus Tutorial Endpoint 1",
+      "destination_endpoint_id": "ddb59af0-6d04-11e5-ba46-22000b92c6ec",
+      "destination_endpoint_display_name": "Globus Tutorial Endpoint 2",
+      "files": 0,
+      "directories": 0,
+      "effective_bytes_per_second": 0,
+      "bytes_transferred": 0,
+      "status": "ACTIVE",
+    },
+    {
+      "task_id": "bb578fe4-f799-11ea-abce-0213fe609573",
+      "submission_id": "bb578fe5-f799-11ea-abce-0213fe609573",
+      "start_time": "2020-09-15T21:23:43.621060Z",
+      "completion_time": "2020-09-15T21:23:45Z",
+      "source_endpoint_id": "ddb59af0-6d04-11e5-ba46-22000b92c6ec",
+      "source_endpoint_display_name": "Globus Tutorial Endpoint 2",
+      "destination_endpoint_id": "ddb59af0-6d04-11e5-ba46-22000b92c6ec",
+      "destination_endpoint_display_name": "Globus Tutorial Endpoint 2",
+      "files": 1,
+      "directories": 0,
+      "effective_bytes_per_second": 3,
+      "bytes_transferred": 4,
+      "status": "SUCCEEDED",
+    }
+  ]
+}
+```
+
+#### GET /manifest/{manifest_id}/transfer/{manifest_transfer_id}/
+
+* Get the current state of the manifest transfer. The manifest may contain multiple 
+    transfers if the manifest contained multiple sources. 
+
+
+```
+{
+  "manifest_id": "05cc3754-1ce2-46ea-8d15-4fffad119690",
+  "manifest_transfer_id": "067f0ed0-9be9-484d-b2ff-eaf36d8e797f",
+  "user": "nickolaussaint@globusid.org",
+  "status": "SUCCEEDED",
+  "transfers": [
+    {
+      "task_id": "b281302a-f771-11ea-8929-0a5521ff3f4b",
+      "submission_id": "b281302b-f771-11ea-8929-0a5521ff3f4b",
+      "start_time": "2020-09-15T16:37:09.743331Z",
+      "completion_time": "2020-09-15T16:37:12Z",
+      "source_endpoint_id": "ddb59aef-6d04-11e5-ba46-22000b92c6ec",
+      "source_endpoint_display_name": "Globus Tutorial Endpoint 1",
+      "destination_endpoint_id": "ddb59af0-6d04-11e5-ba46-22000b92c6ec",
+      "destination_endpoint_display_name": "Globus Tutorial Endpoint 2",
+      "files": 1,
+      "directories": 0,
+      "effective_bytes_per_second": 2,
+      "bytes_transferred": 4,
+      "status": "SUCCEEDED",
+    },
+    {
+      "task_id": "b30123d2-f771-11ea-8929-0a5521ff3f4b",
+      "submission_id": "b30123d3-f771-11ea-8929-0a5521ff3f4b",
+      "start_time": "2020-09-15T16:37:09.752507Z",
+      "completion_time": "2020-09-15T16:37:11Z",
+      "source_endpoint_id": "ddb59af0-6d04-11e5-ba46-22000b92c6ec",
+      "source_endpoint_display_name": "Globus Tutorial Endpoint 2",
+      "destination_endpoint_id": "ddb59af0-6d04-11e5-ba46-22000b92c6ec",
+      "destination_endpoint_display_name": "Globus Tutorial Endpoint 2",
+      "files": 1,
+      "directories": 0,
+      "effective_bytes_per_second": 3,
+      "bytes_transferred": 4,
+      "status": "SUCCEEDED",
+    }
+  ]
+}```
