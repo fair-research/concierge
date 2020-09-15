@@ -29,7 +29,15 @@ manifest_detail_urls = [
     path('<pk>/', ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer)),
 ]
 
+transfers = [
+]
+
 manifests = [
+    path('transfer/', TransferViewSet.as_view({'get': 'list'}, serializer_class=ManifestTransferSerializer)),
+    path('<manifest_id>/transfer/',
+         TransferViewSet.as_view({'post': 'create'}, serializer_class=ManifestTransferSerializer)),
+    path('<manifest_id>/transfer/<manifest_transfer_id>/',
+         TransferViewSet.as_view({'get': 'retrieve'}, serializer_class=ManifestTransferSerializer)),
     # List all manifests, agostic of type
     # path('', include(format_suffix_patterns(manifest_detail_urls, allowed=['json', 'html']))),
     path('', ManifestViewSet.as_view({'get': 'list'}, serializer_class=ManifestListSerializer)),
@@ -48,16 +56,11 @@ manifests = [
          ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=RemoteFileManifestSerializer)),
     # path('<pk>/bdbag/',
     #      ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=serializers.Serializer)),
-    path('<manifest_uuid>/transfer/',
-         TransferViewSet.as_view({'post': 'create'}, serializer_class=ManifestTransferSerializer)),
-    path('<manifest_uuid>/transfer/<transfer_manifest_uuid>/',
-         TransferViewSet.as_view({'get': 'retrieve'}, serializer_class=ManifestTransferSerializer)),
-    path('transfer/',
-         TransferViewSet.as_view({'get': 'list'}, serializer_class=ManifestTransferSerializer)),
 ]
 
 # Include the schema view in our urls.
 urlpatterns = [
+    path('api/manifest/transfer/', include(transfers)),
     path('api/manifest/', include(manifests)),
 
     path('api/automate/transfer/',

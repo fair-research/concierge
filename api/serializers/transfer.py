@@ -79,6 +79,7 @@ class TransferSerializer(serializers.Serializer):
     class Meta:
         model = api.models.Transfer
         # read_only_fields = ()
-        # exclude = ('id',)
-        fields = '__all__'
+        exclude = ('user',)
+        # fields = '__all__'
+
         required_fields = ['manifest', 'destination']

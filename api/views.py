@@ -2,8 +2,10 @@ from __future__ import unicode_literals
 import logging
 from django.contrib.auth import logout as django_logout
 from django.shortcuts import redirect
+from django.core.exceptions import ValidationError
 from rest_framework import viewsets, permissions, response
 from rest_framework.request import Request
+from rest_framework.response import Response
 from gap.views import ActionViewSet
 from gap.serializers import ActionSerializer
 from gap.models import Action
@@ -32,9 +34,9 @@ class ManifestViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOwnerOrReadOnly,)
     http_method_names = ['head', 'get', 'post', 'delete']
 
-    def retrieve(self, request, *args, **kwargs):
-        log.debug(request, args, kwargs)
-        return super().retrieve(request, *args, **kwargs)
+    # def retrieve(self, request, *args, **kwargs):
+    #     log.debug(request, args, kwargs)
+    #     return super().retrieve(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
@@ -50,6 +52,20 @@ class TransferViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated, IsOwner)
     queryset = ManifestTransfer.objects.all()
     http_method_names = ['head', 'get', 'post']
+
+    def get_object(self):
+        return ManifestTransfer.objects.get(manifest=self.kwargs['manifest_id'],
+                                            id=self.kwargs['manifest_transfer_id'])
+
+    def retrieve(self, response, *args, **kwargs):
+        # if self.kwargs.get('manifest_id') and self.kwargs.get('manifest_transfer_id'):
+        try:
+            return super().retrieve(response, *args, **kwargs)
+        except KeyError:
+            return Response({'error': 'You must provide both manifest_id and manifest_transfer_id'},
+                            status=400)
+        except ValidationError as ve:
+            return Response({'error': ve.messages[0]}, 400)
 
 
 # class TransferManifestViewSet(viewsets.ModelViewSet):

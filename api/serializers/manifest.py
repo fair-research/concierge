@@ -75,13 +75,14 @@ class GlobusManifestItemSerializer(serializers.Serializer):
 
 class GlobusManifestSerializer(serializers.ModelSerializer):
 
+    manifest_id = serializers.ReadOnlyField(source='id')
     manifest_items = GlobusManifestItemSerializer(many=True)
     user = serializers.ReadOnlyField(source='user.username')
 
     class Meta:
-        fields = ('id', 'user', 'manifest_items')
+        fields = ('manifest_id', 'user', 'manifest_items')
         model = api.models.Manifest
-        read_only_fields = ['id', 'user']
+        read_only_fields = ['manifest_id', 'user']
 
     def create(self, validated_data):
         rfm = api.manifest.gm_to_rfm(validated_data['manifest_items'])
@@ -104,18 +105,24 @@ class GlobusManifestSerializer(serializers.ModelSerializer):
 
 
 class ManifestTransferSerializer(serializers.ModelSerializer):
+    manifest_id = serializers.ReadOnlyField(source='manifest.id')
+    manifest_transfer_id = serializers.ReadOnlyField(source='id')
+
     user = serializers.ReadOnlyField(source='user.username')
+    status = serializers.ReadOnlyField()
     destination = api.serializers.transfer.GlobusURL(
-        help_text='Globus endpoint and path destination to transfer manifest files.')
+        help_text='Globus endpoint and path destination to transfer manifest files',
+        write_only=True,
+    )
 
     class Meta:
         model = api.models.ManifestTransfer
-        exclude = ('action',)
-        read_only_fields = ['id', 'user', 'transfers']
+        exclude = ('action', 'id', 'manifest')
+        read_only_fields = ['manifest_transfer_id', 'user', 'status', 'transfers']
         depth = 1
 
     def create(self, validated_data):
-        manifest_id = self.context['view'].kwargs['manifest_uuid']
+        manifest_id = self.context['view'].kwargs['manifest_id']
         manifest = api.models.Manifest.objects.get(id=manifest_id)
         try:
             rfm = RemoteFileManifestSerializer(manifest)
@@ -124,12 +131,17 @@ class ManifestTransferSerializer(serializers.ModelSerializer):
             gm = GlobusManifestSerializer(manifest)
             gm_data = gm.to_internal_value(gm.data)
         auth = self.context['request'].auth
-        transfer = api.transfer.transfer_manifest(auth, gm_data, validated_data['destination'])
-        tinfo = {i: transfer.get(i) for i in ['submission_id', 'task_id']}
-        tinfo['status'] = transfer['code']
-        tinfo['user'] = auth.user
-
-        transfer_model = api.models.Transfer(**tinfo)
-        transfer_model.save()
-        return api.models.ManifestTransfer.objects.create(
-            user=auth.user, transfer=transfer_model)
+        dest = validated_data['destination']
+        transfers = api.transfer.transfer_manifest(auth, gm_data, dest)
+        manifest_transfer = api.models.ManifestTransfer.objects.create(
+            user=auth.user, manifest=manifest, destination=dest
+        )
+        for transfer in transfers:
+            transfer_m = api.models.Transfer.objects.create(**dict(
+                submission_id=transfer.get('submission_id'),
+                task_id=transfer.get('task_id'),
+                status=transfer.get('code'),
+                user=auth.user,
+            ))
+            manifest_transfer.transfers.add(transfer_m)
+        return manifest_transfer

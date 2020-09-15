@@ -1,7 +1,6 @@
 import os
 import logging
 from django.conf import settings
-from collections import defaultdict
 import globus_sdk
 
 from api.exc import GlobusTransferException
@@ -51,6 +50,15 @@ def submit_transfer(auth, source_endpoint, destination_endpoint, data,
             log.exception(tapie)
         raise GlobusTransferException(tapie.message,
                                       status_code=status_code, code=tapie.code)
+
+
+def get_task(auth, task_id):
+    return get_tasks(auth, [task_id])[0]
+
+
+def get_tasks(auth, task_ids):
+    tc = get_transfer_client(auth)
+    return [tc.get_task(task_id) for task_id in task_ids]
 
 
 def transfer_manifest(auth, globus_manifest, destination):
@@ -108,5 +116,3 @@ def transfer_manifest(auth, globus_manifest, destination):
                                           status_code=status_code, code=tapie.code)
     log.debug('All transfers submitted successfully')
     return transfers
-
-

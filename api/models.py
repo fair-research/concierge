@@ -2,10 +2,12 @@ import logging
 import json
 import time
 import uuid
+import datetime
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
 import api.manifest
+import api.transfer
 
 import api
 
@@ -133,19 +135,62 @@ class Manifest(models.Model):
 
 class Transfer(models.Model):
     task_id = models.UUIDField(primary_key=True)
-    user = models.ForeignKey(User, related_name='transfers',
-                             on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name='transfers', on_delete=models.CASCADE)
     submission_id = models.UUIDField()
     start_time = models.DateTimeField(auto_now_add=True)
     completion_time = models.DateTimeField(null=True)
+    source_endpoint_id = models.UUIDField(null=True)
+    source_endpoint_display_name = models.CharField(max_length=128, default='')
+    destination_endpoint_id = models.UUIDField(null=True)
+    destination_endpoint_display_name = models.CharField(max_length=128, default='')
+    files = models.IntegerField(default=0)
+    directories = models.IntegerField(default=0)
+    effective_bytes_per_second = models.IntegerField(default=0)
+    bytes_transferred = models.IntegerField(default=0)
+
     status = models.CharField(max_length=32)
+
+    def update(self):
+        if self.status in ['FAILED', 'PAUSED', 'SUCCEEDED']:
+            log.debug(f'Task {self.task_id} {self.status}, skipping...')
+            return
+        log.debug(f'Updating task {self.task_id}')
+        task = api.transfer.get_task(ConciergeToken.from_user(self.user), str(self.task_id))
+        # from pprint import pprint
+        # pprint(task.data)
+        self.status = task['status']
+        self.source_endpoint_id = task['source_endpoint_id']
+        self.source_endpoint_display_name = task['source_endpoint_display_name'] or task['source_endpoint']
+
+        self.destination_endpoint_id = task['destination_endpoint_id']
+        self.destination_endpoint_display_name = (task['destination_endpoint_display_name'] or
+                                                  task['destination_endpoint'])
+        self.files = task['files']
+        self.directories = task['directories']
+        self.bytes_transferred = task['bytes_transferred']
+        self.effective_bytes_per_second = task['effective_bytes_per_second']
+        if task['completion_time']:
+            self.completion_time = datetime.datetime.fromisoformat(task['completion_time'])
+        self.save()
 
 
 class ManifestTransfer(models.Model):
-    id = models.UUIDField(primary_key=True)
-    user = models.ForeignKey(User, related_name='manifests',
-                             on_delete=models.CASCADE)
-    manifest = models.ForeignKey(Manifest, blank=True, null=True, on_delete=models.CASCADE)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, related_name='manifests', on_delete=models.CASCADE)
+    manifest = models.ForeignKey(Manifest, on_delete=models.CASCADE)
+    destination = models.CharField(max_length=512)
     transfers = models.ManyToManyField(Transfer)
     action = models.ForeignKey('gap.Action', models.SET_NULL,
                                blank=True, null=True,)
+
+    @property
+    def status(self):
+        # THIS IS TERRIBLE, IT SHOULD BE MOVED TO AN ASYNC ROUTINE, NOT PIGGYBACKED ON USER REQUESTS
+        for transfer in self.transfers.all():
+            transfer.update()
+
+        statuses = [t.status for t in self.transfers.all()]
+        if all([s == 'SUCCEEDED' for s in statuses]):
+            return 'SUCCEEDED'
+        if any([s == 'FAILED' for s in statuses]):
+            return 'FAILED'
