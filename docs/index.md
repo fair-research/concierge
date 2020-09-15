@@ -61,6 +61,18 @@ example:
 
     Authorization: Bearer TOKEN
     
+Example using Python Requests:
+
+```
+import requests
+
+response = requests.post(
+    'https://develop.concierge.nick.globuscs.info/api/manifest/', 
+    headers={'Authorization': f'Bearer {my_token}'}
+)
+print(response.json())
+```
+
 ## Terminology
 
 ### API Terminology
