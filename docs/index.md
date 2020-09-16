@@ -1,10 +1,13 @@
 ## Overview
 
-The Concierge Service provides a method of tracking and transferring remote
-files through Globus. Files can be tracked with a variety of manifest formats,
-including BDBags, Globus Manifests, and Remote File Manifests.
-Creation of a manifest results in a UUID which can be shared with others and used
-to view the collection or transfer it to another Globus Endpoint.
+The Concierge (Manifest) Service provides a way of constructing virtual datasets 
+using manifests, and operating on the contents of the manifest. 
+A manifest can be defined using a JSON format, that includes file name and folders,
+and metadata about the files such as checksum. Once the manifest is registered
+with the service, a reference to the manifest in the service is provided. 
+The service allows operating on the manifests including transferring the
+contents of the manifest.  Files can be also be exported to other formats,
+including BDBags, and Remote File Manifests.
 
 
 ### The Concierge API
