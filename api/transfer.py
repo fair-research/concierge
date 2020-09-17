@@ -96,7 +96,12 @@ def transfer_manifest(auth, globus_manifest, destination):
         is_dir = src.endswith('/')
         if is_dir:
             transfer_data[endpoint].add_item(src, dest, recursive=True)
-        elif item.get('checksum'):
+        # @HACK -- Using checksums at this point does not account for endpoints which do not
+        # support the given algorithm. This is a HUGE problem for sha256, which currently
+        # fails for any endpoint (and I'm not really sure why)
+        # Until we can properly fall back on md5 or no checksum, this should be disabled, as
+        # it effectively prevents transfers for unsupported checksums.
+        elif item.get('checksum') and False:
             log.debug(item['checksum'])
             transfer_data[endpoint].add_item(src, dest,
                                              external_checksum=item['checksum']['value'],
