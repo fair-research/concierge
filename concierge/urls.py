@@ -44,14 +44,14 @@ manifests = [
     # GET/CREATE as Gloubs Manifest
     path('globus_manifest/',
          ManifestViewSet.as_view({'post': 'create'}, serializer_class=GlobusManifestSerializer)),
+    path('remote_file_manifest/',
+         ManifestViewSet.as_view({'post': 'create'}, serializer_class=RemoteFileManifestSerializer)),
     path('<pk>/', ManifestViewSet.as_view({'get': 'retrieve',
                                            'delete': 'delete'}, serializer_class=GlobusManifestSerializer)),
     # path('<pk>/', ManifestViewSet.as_view({'delete': 'delete'}, serializer_class=serializers.Serializer)),
     path('<pk>/globus_manifest/',
          ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=GlobusManifestSerializer)),
     # GET/CREATE as remote file manifest
-    path('remote_file_manifest/',
-         ManifestViewSet.as_view({'post': 'create'}, serializer_class=RemoteFileManifestSerializer)),
     path('<pk>/remote_file_manifest/',
          ManifestViewSet.as_view({'get': 'retrieve'}, serializer_class=RemoteFileManifestSerializer)),
     # path('<pk>/bdbag/',
