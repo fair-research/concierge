@@ -66,6 +66,8 @@ class TransferViewSet(viewsets.ModelViewSet):
                             status=400)
         except ValidationError as ve:
             return Response({'error': ve.messages[0]}, 400)
+        except ManifestTransfer.DoesNotExist as dne:
+            return Response({'error': dne}, 404)
 
 
 # class TransferManifestViewSet(viewsets.ModelViewSet):
