@@ -24,8 +24,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'set this to be something secret in product
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if os.getenv('DEBUG') == 'True' else False
 
-ALLOWED_HOST = os.getenv('ALLOWED_HOST')
-ALLOWED_HOSTS = [ALLOWED_HOST] if ALLOWED_HOST else []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
 # AWS access
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
@@ -171,6 +170,14 @@ LOGGING = {
         },
     },
     'loggers': {
+        # Quash invalid host header messages. We get a lot of these from random
+        # internet bots connecting via IP. We SHOULD ignore them at the NGINX
+        # level, but I'm not sure how to do that with elastic beanstalk yet...
+        'django.security.DisallowedHost': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
         'django.db.backends': {
                     'handlers': ['null'],  # Quiet by default!
                     'propagate': False,
