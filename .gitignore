@@ -114,5 +114,6 @@ venv.bak/
 
 # Elastic Beanstalk Files
 .ebextensions/settings.config
+.elasticbeanstalk/config.yml
 # !.elasticbeanstalk/*.cfg.yml
 #!.elasticbeanstalk/*.global.yml
