@@ -9,6 +9,15 @@ from gap.serializers import ActionSerializer, ActionCreateSerializer, ActionStat
 log = logging.getLogger(__name__)
 
 
+class IsAuthenticatedOrIntrospect(permissions.BasePermission):
+    """This is an automate based custom permission. It requires auth on each method,
+    except for the 'introspect' method, which is public and allowed by any user."""
+
+    def has_permission(self, request, view):
+        is_introspect = view.action_map.get(request.method.lower()) == 'introspect'
+        return is_introspect or request.user.is_authenticated
+
+
 class ActionViewSet(viewsets.ModelViewSet):
     """
     run: Run the action, either stand alone or as part of an Automate Flow.
@@ -18,7 +27,7 @@ class ActionViewSet(viewsets.ModelViewSet):
     release: Deletes the stored data for this action.
     cancel: Stops the current action, if the action supports it.
     """
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedOrIntrospect,)
     serializer_class = ActionSerializer
     http_method_names = ['get', 'post', 'head']
     queryset = Action.objects.all()
