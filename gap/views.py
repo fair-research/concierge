@@ -1,8 +1,9 @@
 import logging
-from django.urls import path
+from django.urls import path, include
 from rest_framework import viewsets, permissions, serializers
 from rest_framework.response import Response
 from gap.models import Action
+from rest_framework.schemas.openapi import SchemaGenerator
 from gap.serializers import ActionSerializer, ActionCreateSerializer, ActionStatusSerializer
 
 log = logging.getLogger(__name__)
@@ -45,7 +46,10 @@ class ActionViewSet(viewsets.ModelViewSet):
         return super().create(request)
 
     def introspect(self, request):
-        return Response({'error': 'Not Implemented'})
+        # Generate a path based on the standard automate URLs above
+        patterns = [path(request.path, include(self.urls()))]
+        generator = SchemaGenerator(patterns=patterns)
+        return Response(generator.get_schema())
 
     def status(self, request, action_id):
         return self.retrieve(request, action_id)
