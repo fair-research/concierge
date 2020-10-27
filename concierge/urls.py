@@ -13,7 +13,7 @@ from api.serializers.manifest import (
 
 api = openapi.Info(
     title="Concierge Service API",
-    default_version='v2',
+    default_version='v2.0.0',
     description=settings.SERVICE_DESCRIPTION,
     contact=openapi.Contact(email="support@globus.org"),
     license=openapi.License(name="Apache2"),

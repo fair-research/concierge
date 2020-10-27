@@ -122,14 +122,20 @@ class ManifestTransferSerializer(serializers.ModelSerializer):
         depth = 1
 
     def create(self, validated_data):
-        manifest_id = self.context['view'].kwargs['manifest_id']
+        # So, this is really annoying. The base "ManifestTransfer" spec differs from the
+        # Automate spec. ManifestTransfer expects manifest_id passed inside the URL, while
+        # the Automate Spec expects it passed within the POST data.
+        manifest_id = self.context['view'].kwargs.get('manifest_id',
+                                                      validated_data.get('manifest_id'))
         manifest = api.models.Manifest.objects.get(id=manifest_id)
         try:
             rfm = RemoteFileManifestSerializer(manifest)
             gm_data = api.manifest.rfm_to_gm(rfm.to_internal_value(rfm.data))
+            log.debug('Created ManifestTransfer via Remote File Manifest')
         except Exception:
             gm = GlobusManifestSerializer(manifest)
             gm_data = gm.to_internal_value(gm.data)
+            log.debug('Created ManifestTransfer via Globus Manifest')
         auth = self.context['request'].auth
         dest = validated_data['destination']
         transfers = api.transfer.transfer_manifest(auth, gm_data, dest)
@@ -144,4 +150,5 @@ class ManifestTransferSerializer(serializers.ModelSerializer):
                 user=auth.user,
             ))
             manifest_transfer.transfers.add(transfer_m)
+        log.debug(f'Started {len(transfers)} transfers')
         return manifest_transfer

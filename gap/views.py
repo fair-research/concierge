@@ -1,25 +1,18 @@
 import logging
 from django.urls import path, include
-from rest_framework import viewsets, permissions, serializers
+from rest_framework import viewsets, serializers
 from rest_framework.response import Response
 from gap.models import Action
 from rest_framework.schemas.openapi import SchemaGenerator
+from gap import permissions
 from gap.serializers import ActionSerializer, ActionCreateSerializer, ActionStatusSerializer
 
 log = logging.getLogger(__name__)
 
 
-class IsAuthenticatedOrIntrospect(permissions.BasePermission):
-    """This is an automate based custom permission. It requires auth on each method,
-    except for the 'introspect' method, which is public and allowed by any user."""
-
-    def has_permission(self, request, view):
-        is_introspect = view.action_map.get(request.method.lower()) == 'introspect'
-        return is_introspect or request.user.is_authenticated
-
-
 class ActionViewSet(viewsets.ModelViewSet):
     """
+    title, subtitle, description, keywords
     run: Run the action, either stand alone or as part of an Automate Flow.
     list: Lists all of the user's current actions which have not been released
     introspect: Returns a schema which lists all possible values allowed by this Automate Action
@@ -27,13 +20,19 @@ class ActionViewSet(viewsets.ModelViewSet):
     release: Deletes the stored data for this action.
     cancel: Stops the current action, if the action supports it.
     """
-    permission_classes = (IsAuthenticatedOrIntrospect,)
+    permission_classes = (permissions.IsVisibleTo, permissions.IsRunnableBy)
     serializer_class = ActionSerializer
     http_method_names = ['get', 'post', 'head']
     queryset = Action.objects.all()
     lookup_field = 'action_id'
     create_serializer_class = ActionCreateSerializer
     status_serializer_class = ActionStatusSerializer
+    visible_to = [permissions.PUBLIC]
+    runnable_by = [permissions.ALL_AUTHENTICATED_USERS]
+    # https://action-provider-tools.readthedocs.io/en/latest/action_provider_interface.html#action-provider-document-types  # noqa
+    api_version = '1.0'
+    synchronous = False
+    log_supported = False
 
     @classmethod
     def urls(cls):
@@ -55,6 +54,25 @@ class ActionViewSet(viewsets.ModelViewSet):
         return super().create(request)
 
     def introspect(self, request):
+        """
+        description = ActionProviderDescription(
+        globus_auth_scope=config.our_scope,
+        title="What Time Is It Right Now?",
+        admin_contact="support@whattimeisrightnow.example",
+        synchronous=False,
+        input_schema=schema,
+        api_version="1.0",
+        subtitle=(
+            "From the makers of Philbert: "
+            "Another exciting promotional tie-in for whattimeisitrightnow.com"
+        ),
+        description="",
+        keywords=["time", "whattimeisitnow", "productivity"],
+        visible_to=["all_authenticated_users"],
+        runnable_by=["all_authenticated_users"],
+        administered_by=["support@whattimeisrightnow.example"],
+        )
+        """
         # Generate a path based on the standard automate URLs above
         patterns = [path(request.path, include(self.urls()))]
         generator = SchemaGenerator(patterns=patterns)

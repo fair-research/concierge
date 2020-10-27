@@ -114,13 +114,12 @@ class TransferManifestActionViewSet(ActionViewSet):
     status_serializer_class = ManifestTransferActionStatusSerializer
 
     def get_manifest(self, action=None, action_id=None):
-        # log.debug(self.kwargs)
         if not action:
             if not action_id:
                 action = self.get_object()
             else:
                 action = Action.objects.get(action_id=action_id)
-        log.debug(f'Fetching manifest with action action {action}')
+        log.debug(f'Fetching manifest with action {action}')
         return ManifestTransfer.objects.get(action=action)
 
     def cancel(self, request, action_id):
