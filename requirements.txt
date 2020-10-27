@@ -9,3 +9,4 @@ python-jose[cryptography]>=3.0.1
 bdbag==1.3.0
 minid>=2.0.0b3
 psycopg2-binary
+globus-action-provider-tools
