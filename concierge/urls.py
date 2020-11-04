@@ -63,8 +63,7 @@ urlpatterns = [
     path('api/manifest/transfer/', include(transfers)),
     path('api/manifest/', include(manifests)),
 
-    path('api/automate/transfer/',
-         include(TransferManifestActionViewSet.urls())),
+    path('api/automate/transfer/', include(TransferManifestActionViewSet.urls())),
     path('schema.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('', schema_view.with_ui('swagger', cache_timeout=0),
          name='schema-swagger-ui'),

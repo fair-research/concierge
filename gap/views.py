@@ -1,11 +1,11 @@
 import logging
 from django.urls import path, include
-from rest_framework import viewsets, serializers
+from rest_framework import viewsets, serializers, status
 from rest_framework.response import Response
 from gap.models import Action
 from rest_framework.schemas.openapi import SchemaGenerator
 from gap import permissions
-from gap.serializers import ActionSerializer, ActionCreateSerializer, ActionStatusSerializer
+from gap.serializers import ActionCreateSerializer, ActionStatusSerializer
 
 log = logging.getLogger(__name__)
 
@@ -21,11 +21,13 @@ class ActionViewSet(viewsets.ModelViewSet):
     cancel: Stops the current action, if the action supports it.
     """
     permission_classes = (permissions.IsVisibleTo, permissions.IsRunnableBy)
-    serializer_class = ActionSerializer
     http_method_names = ['get', 'post', 'head']
     queryset = Action.objects.all()
+    details_obj = None
     lookup_field = 'action_id'
-    create_serializer_class = ActionCreateSerializer
+    detail_serializer_class = serializers.Serializer
+    body_serializer_class = serializers.Serializer
+    request_serializer_class = ActionCreateSerializer
     status_serializer_class = ActionStatusSerializer
     visible_to = [permissions.PUBLIC]
     runnable_by = [permissions.ALL_AUTHENTICATED_USERS]
@@ -36,22 +38,61 @@ class ActionViewSet(viewsets.ModelViewSet):
 
     @classmethod
     def urls(cls):
+        class BodySerializer(cls.request_serializer_class):
+            body = cls.body_serializer_class
+
+        class DetailSerializer(cls.status_serializer_class):
+            detail = cls.detail_serializer_class
+
         return [
             path('', cls.as_view({'get': 'introspect'}, serializer_class=serializers.Serializer)),
             # path('list', cls.as_view({'get': 'list'})),
-            path('run', cls.as_view({'post': 'run'}, serializer_class=cls.create_serializer_class)),
-            path('<action_id>/status', cls.as_view({'get': 'status'}, serializer_class=cls.status_serializer_class)),
-            path('<action_id>/cancel', cls.as_view({'post': 'cancel'}, serializer_class=serializers.Serializer)),
-            path('<action_id>/release', cls.as_view({'post': 'release'}, serializer_class=serializers.Serializer)),
+            path('run', cls.as_view({'post': 'run'}, serializer_class=BodySerializer)),
+            path('<action_id>/status', cls.as_view({'get': 'status'}, serializer_class=DetailSerializer)),
+            path('<action_id>/cancel', cls.as_view({'post': 'cancel'}, serializer_class=DetailSerializer)),
+            path('<action_id>/release', cls.as_view({'post': 'release'}, serializer_class=DetailSerializer)),
         ]
+
+    def create(self, request, *args, **kwargs):
+        """Create is overridden in rest_framework in order to handle fetching the extra
+        'body' object for the response, which is saved in a separate model."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        data = serializer.data
+        details_instance = self.get_details_object(serializer.instance.action_id)
+        details_serializer = self.body_serializer_class(details_instance)
+        data['body'] = details_serializer.data
+        headers = self.get_success_headers(serializer.data)
+        return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def retrieve(self, request, *args, **kwargs):
+        """retrieve is overridden in rest_framework to handle setting the extra 'details'
+        object, which is stored on a subclassed model."""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        # Get 'details' object containing all the data/work for this automate action.
+        details_instance = self.get_details_object(data['action_id'])
+        details_serializer = self.detail_serializer_class(details_instance)
+        data['details'] = details_serializer.data
+        return Response(data)
+
+    def get_details_object(self, action_id):
+        if self.details_object is None:
+            raise AttributeError(f'You must set "details_object=<Your Model Object> for {self}')
+        return self.details_object.objects.get(action_id=action_id)
 
     def run(self, request):
         request_id = request.data.get('request_id')
         if request_id:
-            previous_action = Action.objects.filter(request_id=request_id)
-            if previous_action:
-                return self.status(request, action_id=previous_action.first().action_id)
-        return super().create(request)
+            log.debug(f'Found request_id {request_id} for user {request.user}')
+            try:
+                previous_action = Action.objects.get(request_id=request_id, creator=request.user)
+                return Response(self.status_serializer_class(previous_action).data)
+            except Action.DoesNotExist:
+                pass
+        return self.create(request)
 
     def introspect(self, request):
         """
@@ -78,7 +119,7 @@ class ActionViewSet(viewsets.ModelViewSet):
         generator = SchemaGenerator(patterns=patterns)
         return Response(generator.get_schema())
 
-    def status(self, request, action_id):
+    def status(self, request, action_id=None):
         return self.retrieve(request, action_id)
 
     def release(self, request, action_id):

@@ -4,91 +4,49 @@ https://action-provider-tools.readthedocs.io/en/latest/action_provider_interface
 """
 import logging
 from rest_framework import serializers
-from globus_action_provider_tools.data_types import ActionStatusValue
+from rest_framework_dataclasses.serializers import DataclassSerializer
+from globus_action_provider_tools.data_types import ActionStatusValue, ActionStatus, ActionRequest
 
 
 import gap.models
 
 log = logging.getLogger(__name__)
-#
-#
-# class GlobusURNField(serializers.Field):
-#     # '^(urn:globus:(auth:identity|groups:id):([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}))|public$'  # noqa
-#     # WILL PROBABLY BE REPLACED BY GLOBUS ACTION PROVIDER TOOLS
-#     def to_representation(self, value):
-#         return value['urn']
-#
-#     def to_internal_value(self, data):
-#
-#         return {
-#             'urn': data,
-#         }
+
+THIRTY_DAYS = 60 * 60 * 24 * 30
 
 
-class ActionSerializer(serializers.ModelSerializer):
-    """
-           status=ActionStatusValue.ACTIVE,
-        creator_id=request.auth.effective_identity,  # type: ignore
-        label=req.get("label", None),
-        monitor_by=req.get("monitor_by", request.auth.identities),  # type: ignore
-        manage_by=req.get("manage_by", request.auth.identities),  # type: ignore
-        start_time=str(now),
-        completion_time=None,
-        release_after=req.get("release_after", "P30D"),
-        display_status=ActionStatusValue.ACTIVE.name,
-        details=results,
-    """
-
-    request_id = serializers.CharField(write_only=True)
-    release_after = serializers.IntegerField(write_only=True,
-                                             default=gap.models.DEFAULT_RELEASE_AFTER)
-    # details = serializers.JSONField(read_only=True)
-    display_status = serializers.CharField(source='DisplayFields.get_display_status_display', read_only=True)
-
-
+class ActionCreateSerializer(DataclassSerializer, serializers.ModelSerializer):
+    request_id = serializers.CharField(required=False)
+    release_after = serializers.CharField(required=False, default=THIRTY_DAYS)
+    action_id = serializers.UUIDField(read_only=True)
 
     class Meta:
+        dataclass = ActionRequest
         model = gap.models.Action
-        exclude = ['creator', 'manager_by', 'monitor_by']
-        # fields = '__all__'
-        # read_only_fields = ['action_id', 'user', 'status', 'display_status',
-        #                     'details', 'start_time', 'completion_time',
-        #                     'release_after']
 
     def create(self, validated_data):
-        data = dict(
-            status='INACTIVE',
+        action = gap.models.Action.objects.create(
+            request_id=validated_data.request_id,
             creator=self.context['request'].user,
-            # monitor_by='public',
-            # manage_by='public',
-            request_id=validated_data.get('request_id'),
-            release_after=validated_data.get('release_after', 'P30D'),
-            display_status=ActionStatusValue.INACTIVE.name,
+            display_status=ActionStatusValue.INACTIVE.value,
+            release_after=validated_data.release_after,
         )
-        return gap.models.Action.objects.create(**data)
+        # Get the serializer for the 'body' object, or the object which has been
+        # set for doing the work.
+        body_serializer_cls = self.context['view'].body_serializer_class
+        body_serializer = body_serializer_cls(data=validated_data.body, context=self.context)
+        body_serializer.is_valid(raise_exception=True)
+        body_obj = body_serializer.create(body_serializer.validated_data)
+        body_obj.action = action
+        body_obj.save()
+        log.debug(f'Successfully created body object {body_obj}!')
+        return action
 
 
-class ActionCreateSerializer(ActionSerializer):
-
-    body = serializers.JSONField(write_only=True)
-
-    class Meta:
-        model = gap.models.Action
-        fields = ['request_id', 'body', 'release_after']
-
-
-class ActionDetailSerializer(ActionSerializer):
-
-    body = serializers.JSONField(read_only=True)
-
-
-class ActionStatusSerializer(ActionSerializer):
-
-    details = serializers.JSONField(read_only=True)
+class ActionStatusSerializer(DataclassSerializer):
+    status = serializers.CharField()
 
     class Meta:
+        dataclass = ActionStatus
         model = gap.models.Action
-        # fields = '__all__'
-        exclude = ['creator', 'manager_by', 'monitor_by']
-        # read_only_fields = ['id', 'transfers']
-        # depth = 1
+        depth = 1

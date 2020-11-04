@@ -125,8 +125,11 @@ class ManifestTransferSerializer(serializers.ModelSerializer):
         # So, this is really annoying. The base "ManifestTransfer" spec differs from the
         # Automate spec. ManifestTransfer expects manifest_id passed inside the URL, while
         # the Automate Spec expects it passed within the POST data.
-        manifest_id = self.context['view'].kwargs.get('manifest_id',
-                                                      validated_data.get('manifest_id'))
+        try:
+            manifest_id = str(validated_data['manifest']['id'])
+        except KeyError:
+            manifest_id = self.context['view'].kwargs.get('manifest_id')
+        log.debug(f'Creating transfer with manifest_id {manifest_id}')
         manifest = api.models.Manifest.objects.get(id=manifest_id)
         try:
             rfm = RemoteFileManifestSerializer(manifest)

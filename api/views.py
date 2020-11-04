@@ -7,15 +7,12 @@ from rest_framework import viewsets, permissions, response
 from rest_framework.request import Request
 from rest_framework.response import Response
 from gap.views import ActionViewSet
-from gap.serializers import ActionSerializer
-from gap.models import Action
 from api.models import Manifest, ManifestTransfer
 from api.auth import GlobusSessionAuthentication, IsOwnerOrReadOnly, IsOwner
 from api.transfer import get_transfer_client
 
 from api.serializers.manifest import ManifestListSerializer, ManifestTransferSerializer
-# from api.serializers.transfer import TransferSerializer
-from api.serializers.automate import ManifestTransferActionSerializer, ManifestTransferActionStatusSerializer
+from api.serializers.automate import ManifestTransferActionSerializer
 
 log = logging.getLogger(__name__)
 
@@ -70,30 +67,6 @@ class TransferViewSet(viewsets.ModelViewSet):
             return Response({'error': str(dne)}, 404)
 
 
-# class TransferManifestViewSet(viewsets.ModelViewSet):
-#     """
-#     create:
-#     Transfer a Globus Manifest. More info can be found at the
-#     following location https://globusonline.github.io/manifests/overview.html
-#
-#     Note, you must end source directories with '/' to denote a directory.
-#
-#     list:
-#     List the previous manifests you have transferred
-#
-#     detail:
-#     Get more information about a specific Manifest you have transferred
-#     """
-#     permission_classes = (permissions.IsAuthenticated,)
-#     serializer_class = TransferManifestSerializer
-#     http_method_names = ['get', 'post', 'head']
-#
-#     def get_queryset(self):
-#         if self.request.user.is_authenticated:
-#             return TransferManifest.objects.filter(user=self.request.user)
-#         return []
-
-
 class TransferManifestActionViewSet(ActionViewSet):
     """
     Automate action for transferring a given manifest.
@@ -109,35 +82,20 @@ class TransferManifestActionViewSet(ActionViewSet):
     release: Deletes the stored data for this action.
     cancel: Cancel all active transfers.
     """
-    serializer_class = ManifestTransferActionSerializer
-    create_serializer_class = ManifestTransferActionSerializer
-    status_serializer_class = ManifestTransferActionStatusSerializer
-
-    def get_manifest(self, action=None, action_id=None):
-        if not action:
-            if not action_id:
-                action = self.get_object()
-            else:
-                action = Action.objects.get(action_id=action_id)
-        log.debug(f'Fetching manifest with action {action}')
-        return ManifestTransfer.objects.get(action=action)
+    details_object = ManifestTransfer
+    body_serializer_class = detail_serializer_class = ManifestTransferActionSerializer
 
     def cancel(self, request, action_id):
         obj = self.get_manifest(action_id)
         if obj.action.display_status != 'ACTIVE':
             return self.status(request, action_id)
         tc = get_transfer_client(request.auth)
-        task = tc.cancel_task(str(obj.transfer.task_id))
-        obj.action.set_completed(status='FAILED')
-        obj.action.details = task.data
-        action_serializer = ActionSerializer(obj.action)
-        return response.Response(action_serializer.data)
+        tc.cancel_task(str(obj.transfer.task_id))
+        return super().cancel(request, action_id)
 
-    def status(self, request, action_id):
-        obj = self.get_manifest(action_id)
+    def status(self, request, action_id=None):
+        obj = self.get_details_object(action_id)
         action = obj.action
-        # from pprint import pprint
-        # pprint(task.data)
         if action.display_status == 'ACTIVE':
             tc = get_transfer_client(request.auth)
             log.debug(f'Manifest {obj} fetching task {obj.transfer.task_id}')
@@ -153,8 +111,7 @@ class TransferManifestActionViewSet(ActionViewSet):
             action.display_status = transfer_to_action_status[task['status']]
             action.save()
             action.details = task.data
-        action_serializer = ActionSerializer(action)
-        return response.Response(action_serializer.data)
+        return super().status(request, action_id)
 
 
 def logout(request, next='/'):
