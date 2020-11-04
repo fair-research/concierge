@@ -19,6 +19,7 @@ class ActionCreateSerializer(DataclassSerializer, serializers.ModelSerializer):
     request_id = serializers.CharField(required=False)
     release_after = serializers.CharField(required=False, default=THIRTY_DAYS)
     action_id = serializers.UUIDField(read_only=True)
+    status = serializers.CharField(read_only=True, source='display_status')
 
     class Meta:
         dataclass = ActionRequest
@@ -28,7 +29,8 @@ class ActionCreateSerializer(DataclassSerializer, serializers.ModelSerializer):
         action = gap.models.Action.objects.create(
             request_id=validated_data.request_id,
             creator=self.context['request'].user,
-            display_status=ActionStatusValue.INACTIVE.value,
+            status=ActionStatusValue.INACTIVE,
+            display_status=ActionStatusValue.INACTIVE.name,
             release_after=validated_data.release_after,
         )
         # Get the serializer for the 'body' object, or the object which has been

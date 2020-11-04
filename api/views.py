@@ -13,6 +13,7 @@ from api.transfer import get_transfer_client
 
 from api.serializers.manifest import ManifestListSerializer, ManifestTransferSerializer
 from api.serializers.automate import ManifestTransferActionSerializer
+from globus_action_provider_tools.data_types import ActionStatusValue
 
 log = logging.getLogger(__name__)
 
@@ -96,21 +97,18 @@ class TransferManifestActionViewSet(ActionViewSet):
     def status(self, request, action_id=None):
         obj = self.get_details_object(action_id)
         action = obj.action
-        if action.display_status == 'ACTIVE':
-            tc = get_transfer_client(request.auth)
-            log.debug(f'Manifest {obj} fetching task {obj.transfer.task_id}')
-            task = tc.get_task(str(obj.transfer.task_id))
-            action.status = task['nice_status']
-            transfer_to_action_status = {
-                'ACTIVE': 'ACTIVE',
-                'ACCEPTED': 'ACTIVE',
-                'PAUSED': 'INACTIVE',
-                'SUCCEEDED': 'SUCCEEDED',
-                'FAILED': 'FAILED'
-            }
-            action.display_status = transfer_to_action_status[task['status']]
+        if action.display_status in ['INACTIVE', 'ACTIVE']:
+            for transfer in obj.transfers.all():
+                log.debug(f'Updating Transfer {transfer}')
+                transfer.update()
+            tstatus = [t.status for t in obj.transfers.all()]
+            if 'FAILED' in tstatus:
+                action.status = ActionStatusValue.FAILED
+                action.display_status = ActionStatusValue.FAILED.name
+            elif all((s == 'SUCCEEDED') for s in tstatus):
+                action.status = ActionStatusValue.SUCCEEDED.name
+                action.display_status = ActionStatusValue.SUCCEEDED.name
             action.save()
-            action.details = task.data
         return super().status(request, action_id)
 
 
