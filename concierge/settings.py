@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/1.11/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.11/ref/settings/
 """
-from __future__ import unicode_literals
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -20,33 +19,30 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'Keep this secret in production'
+SECRET_KEY = os.getenv('SECRET_KEY', 'set this to be something secret in production!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True if os.getenv('DEBUG') == 'True' else False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
 # AWS access
-AWS_ACCESS_KEY_ID = ""
-AWS_SECRET_ACCESS_KEY = ""
-AWS_BUCKET_NAME = "fair-research-concierge"
-AWS_FOLDER = 'bags'
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+AWS_BUCKET_NAME = os.getenv('AWS_BUCKET_NAME', 'fair-research-concierge')
+AWS_FOLDER = os.getenv('AWS_FOLDER', 'manifests')
+AWS_FOLDER_TEST = os.getenv('AWS_FOLDER_TEST', 'manifests-dev')
+AWS_STAGING_DIR = os.getenv('AWS_STAGING_DIR', '/tmp/concierge_staging')
 
 # Globus
 GLOBUS_DEFAULT_SYNC_LEVEL = 'checksum'
 
-# Minid Server
-MINID_SERVER = "https://portal.sc17.nick.globuscs.info/minid"
-MINID_TEST = False
-
 # Bag Settings
 BAG_STAGING_DIR = '/tmp/bag_staging'
-BAG_ARCHIVE_FORMAT = 'zip'
 
 # Other
-SUPPORTED_STAGING_PROTOCOLS = ['globus']
 SUPPORTED_BAG_PROTOCOLS = ['http', 'https', 'globus']
+SUPPORTED_CHECKSUMS = ['md5', 'sha1', 'sha256', 'sha512']
 # Shows up as a label on user globus transfer lists
 SERVICE_NAME = 'Concierge Service'
 with open(os.path.join(BASE_DIR, 'service_description.md')) as f:
@@ -54,30 +50,24 @@ with open(os.path.join(BASE_DIR, 'service_description.md')) as f:
 
 CONCIERGE_SCOPE = ('https://auth.globus.org/scopes/'
                    '524361f2-e4a9-4bd0-a3a6-03e365cac8a9/concierge')
-MINID_SCOPE = ('https://auth.globus.org/scopes/identifiers.fair-research.org/'
-               'writer')
 TRANSFER_SCOPE = 'urn:globus:auth:scope:transfer.api.globus.org:all'
 
-GLOBUS_KEY = '***'
-GLOBUS_SECRET = '***'
-SOCIAL_AUTH_GLOBUS_KEY = '***'
-SOCIAL_AUTH_GLOBUS_SECRET = '***'
+GLOBUS_KEY = os.getenv('GLOBUS_KEY', '')
+GLOBUS_SECRET = os.getenv('GLOBUS_SECRET', '')
+SOCIAL_AUTH_GLOBUS_KEY = GLOBUS_KEY
+SOCIAL_AUTH_GLOBUS_SECRET = GLOBUS_SECRET
 SOCIAL_AUTH_GLOBUS_SCOPE = [CONCIERGE_SCOPE]
 
 SWAGGER_SETTINGS = {
-   'SECURITY_DEFINITIONS': {
-      'Bearer': {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
             'type': 'apiKey',
             'name': 'Authorization',
             'in': 'header'
-      }
-   }
+        }
+    },
+    'DEFAULT_INFO': 'concierge.urls.api',
 }
-
-# Id for creating minids
-TEST_IDENTIFIER_NAMESPACE = 'HHxPIZaVDh9u'
-IDENTIFIER_NAMESPACE = 'kHAAfCby2zdn'
-DEFAULT_TEST_MINIDS = True
 
 
 # Application definition
@@ -92,6 +82,7 @@ INSTALLED_APPS = [
     'social_django',  # django social auth
     'drf_yasg',
     'api',
+    'gap',
 ]
 
 REST_FRAMEWORK = {
@@ -102,7 +93,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         # Anonymous users are welcome to the base API
     ],
-    'EXCEPTION_HANDLER': 'api.exception_handlers.concierge_exception_handler'
+    'EXCEPTION_HANDLER': 'api.exception_handlers.concierge_exception_handler',
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -145,7 +136,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'wsgi.app'
+WSGI_APPLICATION = 'application.application'
 
 
 # Database
@@ -153,8 +144,12 @@ WSGI_APPLICATION = 'wsgi.app'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.getenv('DB_NAME', os.path.join(BASE_DIR, 'db.sqlite3')),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
 }
 
@@ -179,6 +174,14 @@ LOGGING = {
         },
     },
     'loggers': {
+        # Quash invalid host header messages. We get a lot of these from random
+        # internet bots connecting via IP. We SHOULD ignore them at the NGINX
+        # level, but I'm not sure how to do that with elastic beanstalk yet...
+        'django.security.DisallowedHost': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+            'propagate': False,
+        },
         'django.db.backends': {
                     'handlers': ['null'],  # Quiet by default!
                     'propagate': False,
@@ -190,6 +193,11 @@ LOGGING = {
             'propagate': True,
         },
         'concierge': {
+            'handlers': ['stream'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'gap': {
             'handlers': ['stream'],
             'level': 'DEBUG',
             'propagate': True,
@@ -216,6 +224,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.getenv('STATIC_ROOT', 'static')
 
 try:
     from concierge.local_settings import *  # NOQA

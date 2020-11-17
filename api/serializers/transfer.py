@@ -3,7 +3,6 @@ import uuid
 import urllib
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-
 import api.models
 
 log = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class GlobusURL(serializers.Field):
     PROTOCOLS = ['https', 'http', 'globus']
 
     def to_representation(self, value):
-        return value
+        return value['url']
 
     def to_internal_value(self, data):
         purl = urllib.parse.urlparse(data)
@@ -62,15 +61,25 @@ class GlobusURL(serializers.Field):
                                   f'{data}')
 
         return {
+            'url': data,
             'endpoint': endpoint,
             'path': purl.path,
         }
 
 
-class TransferSerializer(serializers.ModelSerializer):
-    user = serializers.ReadOnlyField(source='user.username')
+class TransferSerializer(serializers.Serializer):
+    # manifest = serializers.UUIDField()
+    # destination = GlobusURL(help_text='Globus URL for transferring the manifest')
+    # label = serializers.CharField(required=False),
+    # notify_on_succeeded = serializers.BooleanField(),
+    # notify_on_failed = serializers.BooleanField(),
+    # notify_on_inactive = serializers.BooleanField(),
+    # user = serializers.ReadOnlyField(source='user.username')
 
     class Meta:
         model = api.models.Transfer
-        read_only_fields = ()
-        exclude = ('id',)
+        # read_only_fields = ()
+        exclude = ('user',)
+        # fields = '__all__'
+
+        required_fields = ['manifest', 'destination']

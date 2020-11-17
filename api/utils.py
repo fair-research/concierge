@@ -6,21 +6,20 @@ import json
 import uuid
 import requests
 import logging
-import boto3
 import globus_sdk
 from six.moves.urllib_parse import urlsplit
 from django.conf import settings
 import bagit
 from bdbag import bdbag_api
-from fair_identifiers_client.identifiers_api import IdentifierClientError
+# from fair_identifiers_client.identifiers_api import IdentifierClientError
 
-from api.models import Bag
-from api.minid import load_minid_client
+# from api.models import Manifest
+# from api.minid import load_minid_client
 from api.transfer import get_transfer_client
 from api.exc import (
     NoDataToTransfer, ConciergeException, GlobusTransferException
 )
-from api import minid
+# from api import minid
 
 log = logging.getLogger(__name__)
 # When doing a GET request for binary files, load chunks in 1 kilobyte
@@ -97,42 +96,6 @@ def create_unique_folder():
     return name
 
 
-def bag_and_tag(auth, manifest, bag, minid):
-    bag_filename = create_bag_archive(manifest,
-                                      bag.get('metadata'),
-                                      bag.get('ro_metadata'),
-                                      bag.get('name'))
-    location = upload_to_s3(bag_filename)
-    mc = load_minid_client(auth)
-    name = os.path.splitext(os.path.basename(bag_filename))[0]
-    checksums = [{
-        'function': 'sha256',
-        'value': mc.compute_checksum(bag_filename)
-    }]
-    minid = mc.register(checksums, title=name,
-                        locations=[location],
-                        metadata=minid.get('metadata'),
-                        test=minid.get('test',
-                                       settings.DEFAULT_TEST_MINIDS))
-    from pprint import pprint
-    pprint(minid.data)
-    m_id = mc.to_identifier(minid['identifier'], identifier_type='minid')
-    mdata = minid.data
-    mdata['identifier'] = m_id
-    mdata['test'] = m_id.startswith('minid.test')
-    os.remove(bag_filename)
-    return {
-        'bag': {
-            'location': location,
-            'minid': m_id,
-            'metadata': bag.get('metadata'),
-            'ro_metadata': bag.get('ro_metadata'),
-            'name': name
-        },
-        'minid': mdata
-    }
-
-
 def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
     try:
         if not name:
@@ -161,52 +124,29 @@ def create_bag_archive(manifest, bag_metadata, ro_metadata, name):
         raise ConciergeException(str(e), code='bdbag_creation_error')
 
 
-def get_s3_key(filename):
-    return os.path.join(
-        settings.AWS_FOLDER,
-        os.path.basename(os.path.dirname(filename)),
-        os.path.basename(filename)
-    )
-
-
-def upload_to_s3(filename):
-    key = get_s3_key(filename)
-    s3 = boto3.resource('s3', aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY)
-    with open(filename, 'rb') as data:
-        s3.Bucket(settings.AWS_BUCKET_NAME).upload_fileobj(
-            data,
-            key,
-            ExtraArgs={'ACL': 'public-read'}
-        )
-    loc = 'https://s3.amazonaws.com/{}/{}'.format(settings.AWS_BUCKET_NAME,
-                                                  key)
-    return loc
-
-
-def _resolve_minids_to_bags(auth, minids):
-    bags = Bag.objects.filter(minid__in=minids)
-    bags = list(bags)
-    if len(bags) != len(minids):
-        bad_bags = [b for b in minids
-                    if b not in [bg.minid for bg in bags]]
-        for bag_minid in bad_bags:
-            try:
-                mc = minid.load_minid_client(auth)
-                minid_resp = mc.check(bag_minid).data
-                if not minid_resp['location']:
-                    raise ConciergeException({'error': 'Minid has no location '
-                                             '{}'.format(minid)})
-                loc = minid_resp['location'][0]
-                b = Bag.objects.create(user=auth.user, minid=minid,
-                                       location=loc)
-                b.save()
-                bags.append(b)
-            except IdentifierClientError as ice:
-                log.exception(ice)
-                log.error('User {} unable to resolve minid data.'
-                          ''.format(auth.user))
-    return bags
+# def _resolve_minids_to_bags(auth, minids):
+#     bags = Bag.objects.filter(minid__in=minids)
+#     bags = list(bags)
+#     if len(bags) != len(minids):
+#         bad_bags = [b for b in minids
+#                     if b not in [bg.minid for bg in bags]]
+#         for bag_minid in bad_bags:
+#             try:
+#                 mc = minid.load_minid_client(auth)
+#                 minid_resp = mc.check(bag_minid).data
+#                 if not minid_resp['location']:
+#                     raise ConciergeException({'error': 'Minid has no location '
+#                                              '{}'.format(minid)})
+#                 loc = minid_resp['location'][0]
+#                 b = Bag.objects.create(user=auth.user, minid=minid,
+#                                        location=loc)
+#                 b.save()
+#                 bags.append(b)
+#             except IdentifierClientError as ice:
+#                 log.exception(ice)
+#                 log.error('User {} unable to resolve minid data.'
+#                           ''.format(auth.user))
+#     return bags
 
 
 def download_bag(url):
@@ -231,12 +171,12 @@ def extract_bag(local_bag_archive_path):
     return bagit_bag
 
 
-def fetch_bags(auth, minids):
-    """Given a list of minid bag models, follow their location and
-    fetch the data associated with them, if it doesn't already
-    exist on the filesystem. Returns a list of bagit bag objects"""
-    bags = _resolve_minids_to_bags(auth, minids)
-    return [extract_bag(download_bag(bag.location)) for bag in bags]
+# def fetch_bags(auth, minids):
+#     """Given a list of minid bag models, follow their location and
+#     fetch the data associated with them, if it doesn't already
+#     exist on the filesystem. Returns a list of bagit bag objects"""
+#     bags = _resolve_minids_to_bags(auth, minids)
+#     return [extract_bag(download_bag(bag.location)) for bag in bags]
 
 
 def catalog_transfer_manifest(bagit_bags, bag_dirs=False):
@@ -281,6 +221,8 @@ def transfer_catalog(auth, transfer_manifest, dest_endpoint, dest_prefix,
                      label=None,
                      sync_level=settings.GLOBUS_DEFAULT_SYNC_LEVEL):
     task_ids = []
+    # activate all endpoints before transfer
+    #
     tc = get_transfer_client(auth)
     tc.endpoint_autoactivate(dest_endpoint)
     if not transfer_manifest:

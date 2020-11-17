@@ -30,8 +30,8 @@ def submit_transfer(auth, source_endpoint, destination_endpoint, data,
     """
     try:
         tc = get_transfer_client(auth)
-        tc.endpoint_autoactivate(source_endpoint)
-        tc.endpoint_autoactivate(destination_endpoint)
+        # tc.endpoint_autoactivate(source_endpoint)
+        # tc.endpoint_autoactivate(destination_endpoint)
         tdata = globus_sdk.TransferData(tc, source_endpoint,
                                         destination_endpoint, **kwargs)
         for src, dest, is_dir, algorithm, checksum in data:
@@ -52,7 +52,16 @@ def submit_transfer(auth, source_endpoint, destination_endpoint, data,
                                       status_code=status_code, code=tapie.code)
 
 
-def transfer_manifest(auth, globus_manifest):
+def get_task(auth, task_id):
+    return get_tasks(auth, [task_id])[0]
+
+
+def get_tasks(auth, task_ids):
+    tc = get_transfer_client(auth)
+    return [tc.get_task(task_id) for task_id in task_ids]
+
+
+def transfer_manifest(auth, globus_manifest, destination):
     """
     Submit a validated Globus Manifest. This is intended to be called via
     a serializer after validation has been completed.
@@ -60,19 +69,59 @@ def transfer_manifest(auth, globus_manifest):
     :param globus_manifest: api.serializers.manifest.ManifestSerializer
     :return:
     """
+    transfer_kwargs = {}
     manifest_items = globus_manifest['manifest_items']
-    source_endpoint = manifest_items[0]['source_ref']['endpoint']
-    destination_endpoint = globus_manifest['destination']['endpoint']
-    dest_prefix = globus_manifest['destination']['path']
-    transfer_data = []
+
+    # Activate all endpoints. There may be many source endpoints
+    source_eps = {m['source_ref']['endpoint'] for m in manifest_items}
+    tc = get_transfer_client(auth)
+    for ep in set(list(source_eps) + [destination['endpoint']]):
+        log.debug(f'Auto-activating Globus endpoint: {ep}')
+        try:
+            tc.endpoint_autoactivate(ep)
+        except globus_sdk.exc.TransferAPIError as tapie:
+            raise GlobusTransferException(f'Failed to auto-activate endpoint {ep}',
+                                          status_code=400, code=tapie.code)
+
+    # Collect all files and start the transfer
+    transfer_data = dict()
     for item in manifest_items:
+        endpoint = item['source_ref']['endpoint']
+        if not transfer_data.get(endpoint):
+            transfer_data[endpoint] = globus_sdk.TransferData(
+                tc, endpoint, destination['endpoint'], **transfer_kwargs
+            )
         src = item['source_ref']['path']
-        dest = os.path.join(dest_prefix, item['dest_path'])
+        dest = os.path.join(destination['path'], item['dest_path'])
         is_dir = src.endswith('/')
-        checksum = item.get('checksum', {})
-        alg = checksum.get('algorithm')
-        checksum_value = checksum.get('value')
-        transfer_data.append((src, dest, is_dir, alg, checksum_value))
-    return submit_transfer(auth, source_endpoint,
-                           destination_endpoint,
-                           transfer_data)
+        if is_dir:
+            transfer_data[endpoint].add_item(src, dest, recursive=True)
+        # @HACK -- Using checksums at this point does not account for endpoints which do not
+        # support the given algorithm. This is a HUGE problem for sha256, which currently
+        # fails for any endpoint (and I'm not really sure why)
+        # Until we can properly fall back on md5 or no checksum, this should be disabled, as
+        # it effectively prevents transfers for unsupported checksums.
+        elif item.get('checksum') and False:
+            log.debug(item['checksum'])
+            transfer_data[endpoint].add_item(src, dest,
+                                             external_checksum=item['checksum']['value'],
+                                             checksum_algorithm=item['checksum']['algorithm'])
+        else:
+            transfer_data[endpoint].add_item(src, dest)
+
+    transfers = []
+    for transfer_data in transfer_data.values():
+        try:
+            log.debug('Submitting Transfer')
+            transfers.append(tc.submit_transfer(transfer_data).data)
+        except globus_sdk.exc.TransferAPIError as tapie:
+            # Service Unavailable (503) if Globus Screws up, otherwise assume
+            # the user screwed up with a 400
+            status_code = 503 if tapie.http_status >= 500 else 400
+            if status_code == 503:
+                log.critical('Upstream Globus Transfer error!')
+                log.exception(tapie)
+            raise GlobusTransferException(tapie.message,
+                                          status_code=status_code, code=tapie.code)
+    log.debug('All transfers submitted successfully')
+    return transfers

@@ -1,23 +1,11 @@
 ### Description
 
 The Concierge Service provides a method of tracking and transferring remote
-files through Globus using BDBags and Identifiers. Bags are create with a
-list of remote file references (Remote File Manifest), and that list is then
-tracked with a small identifying string (Identifier). The manifest can then be
-referred to later by the Identifier, or used to transfer the entire set of files
-to a remote Globus Endpoint.
-
-### BDBags
-
-Collections of files are tracked with [BDBags](https://github.com/fair-research/bdbag) through the [Remote File Manifest](https://github.com/fair-research/bdbag/blob/master/doc/config.md#remote-file-manifest)
-spec. Bags can be downloaded after creation for use on a users local machine.
-
-### Identifiers
-
-Bags are tracked through the Concierge Service through Identifiers. Identifiers
-can then be used to transfer or 'stage' bags through this API. Minid Identifiers
-can also be queried or updated directly using the [Minid](https://github.com/fair-research/minid/tree/develop/minid) tool.
-
+files through Globus. Files can be tracked with a variety of manifest formats,
+including [BDBags](https://github.com/fair-research/bdbag), [Globus Manifests](https://globusonline.github.io/manifests/overview.html), and [Remote File Manifests](https://github.com/fair-research/bdbag/blob/master/doc/config.md#remote-file-manifest).
+Creation of a manifest results in a UUID which can be shared with others and used
+to view the collection or transfer it to another Globus Endpoint. 
+ 
 ### The Concierge API
 
 Users can install the Python [Concierge Client](https://github.com/fair-research/concierge-cli) or use this API directly.

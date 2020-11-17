@@ -17,6 +17,15 @@ import api.exc
 log = logging.getLogger(__name__)
 
 
+class IsOwner(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        return obj.user == request.user
+
+
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """Specify which permissions a valid Globus user should have. We currently
     don't have any reason to restrict them from calling any views as long as

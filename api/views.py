@@ -2,93 +2,114 @@ from __future__ import unicode_literals
 import logging
 from django.contrib.auth import logout as django_logout
 from django.shortcuts import redirect
-from rest_framework import viewsets, permissions
+from django.core.exceptions import ValidationError
+from rest_framework import viewsets, permissions, response
 from rest_framework.request import Request
-from api.models import Bag, StageBag, TransferManifest
-from api.auth import GlobusSessionAuthentication
+from rest_framework.response import Response
+from gap.views import ActionViewSet
+from api.models import Manifest, ManifestTransfer
+from api.auth import GlobusSessionAuthentication, IsOwnerOrReadOnly, IsOwner
+from api.transfer import get_transfer_client
 
-from api.serializers.bag import BagCreateListSerializer, StageBagSerializer
-from api.serializers.bag_manifest import BagManifestSerializer
-from api.serializers.manifest import TransferManifestSerializer
-from api.serializers.transfer import TransferSerializer
+from api.serializers.manifest import ManifestListSerializer, ManifestTransferSerializer
+from api.serializers.automate import ManifestTransferActionSerializer
+from globus_action_provider_tools.data_types import ActionStatusValue
 
 log = logging.getLogger(__name__)
 
 
-class BagViewSet(viewsets.ModelViewSet):
+class ManifestViewSet(viewsets.ModelViewSet):
     """
-    The Bag view lists all of the BDBags created through this service.
-
-    retrieve:
-    Fetch a specific bag for further details
-
-    list:
-    Fetch the bags you have previously created.
+    list: List all manifests.
+    retrieve: Fetch and display the contents of a Manifest. Allowed by anyone. \
+    Supports query param ``format`` with valid values ``globus_manifest``, ``remote_file_manifest`` \
+    or ``bdbag``.
+    create: Create a Manifest using the Globus Manifest spec. Must be Authenticated.
+    delete: Delete a manifest. Only allowed by owner.
     """
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = BagCreateListSerializer
-    http_method_names = ['get', 'post', 'head']
+    serializer_class = ManifestListSerializer
+    queryset = Manifest.objects.all()
+    permission_classes = (IsOwnerOrReadOnly,)
+    http_method_names = ['head', 'get', 'post', 'delete']
 
-    def get_queryset(self):
-        if self.request.user.is_authenticated:
-            return Bag.objects.filter(user=self.request.user)
-        return []
+    # def retrieve(self, request, *args, **kwargs):
+    #     log.debug(request, args, kwargs)
+    #     return super().retrieve(request, *args, **kwargs)
 
-
-class StageBagViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = StageBagSerializer
-    http_method_names = ['get', 'post', 'head']
-
-    def get_queryset(self):
-        if self.request.user.is_authenticated:
-            return StageBag.objects.filter(user=self.request.user)
-        return []
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
 
-class BagManifestViewSet(viewsets.ModelViewSet):
+class TransferViewSet(viewsets.ModelViewSet):
     """
-    create:
-    Create a Bag with a Minid given a Globus "Manifest Items" object. More info
-    can be found here: https://globusonline.github.io/manifests/overview.html
-
-    In order to create a BDBag from a Globus Manifest, each Manifest Item must
-    have a checksum.
-
-    All other 'bag' fields are optional.
+    list: List all of a user's previously transferred manifests
+    retrieve: Get the status for an existing manifest transfer
+    create: Transfer a Manifest using an identifier or any previously created manifests (uuid)
     """
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = BagManifestSerializer
-    http_method_names = ['post', 'head']
+    serializer_class = ManifestTransferSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwner)
+    queryset = ManifestTransfer.objects.all()
+    http_method_names = ['head', 'get', 'post']
+
+    def get_object(self):
+        return ManifestTransfer.objects.get(manifest=self.kwargs['manifest_id'],
+                                            id=self.kwargs['manifest_transfer_id'])
+
+    def retrieve(self, response, *args, **kwargs):
+        # if self.kwargs.get('manifest_id') and self.kwargs.get('manifest_transfer_id'):
+        try:
+            return super().retrieve(response, *args, **kwargs)
+        except KeyError:
+            return Response({'error': 'You must provide both manifest_id and manifest_transfer_id'},
+                            status=400)
+        except ValidationError as ve:
+            return Response({'error': ve.messages[0]}, 400)
+        except ManifestTransfer.DoesNotExist as dne:
+            return Response({'error': str(dne)}, 404)
 
 
-class TransferViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = TransferSerializer
-
-
-class TransferManifestViewSet(viewsets.ModelViewSet):
+class TransferManifestActionViewSet(ActionViewSet):
     """
-    create:
-    Transfer a Globus Manifest. More info can be found at the
-    following location https://globusonline.github.io/manifests/overview.html
+    Automate action for transferring a given manifest.
+    https://globusonline.github.io/manifests/overview.html
 
-    Note, you must end source directories with '/' to denote a directory.
-
-    list:
-    List the previous manifests you have transferred
-
-    detail:
-    Get more information about a specific Manifest you have transferred
+    run: Start a transfer for a Globus Manifest. Will include a separate transfer for
+         each unique source endpoint in the manifest provided.
+    list: List the current user's previous transfers
+    introspect: See the JSON Schema for transferring a manifest via a Globus Flow
+    status: Get status for a Manifest Transfer. Will remain ACTIVE until each transfer
+            has been completed. Returns SUCCEEDED if all transfers completed without
+            error and FAILED otherwise.
+    release: Deletes the stored data for this action.
+    cancel: Cancel all active transfers.
     """
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = TransferManifestSerializer
-    http_method_names = ['get', 'post', 'head']
+    details_object = ManifestTransfer
+    body_serializer_class = detail_serializer_class = ManifestTransferActionSerializer
 
-    def get_queryset(self):
-        if self.request.user.is_authenticated:
-            return TransferManifest.objects.filter(user=self.request.user)
-        return []
+    def cancel(self, request, action_id):
+        obj = self.get_manifest(action_id)
+        if obj.action.display_status != 'ACTIVE':
+            return self.status(request, action_id)
+        tc = get_transfer_client(request.auth)
+        tc.cancel_task(str(obj.transfer.task_id))
+        return super().cancel(request, action_id)
+
+    def status(self, request, action_id=None):
+        obj = self.get_details_object(action_id)
+        action = obj.action
+        if action.display_status in ['INACTIVE', 'ACTIVE']:
+            for transfer in obj.transfers.all():
+                log.debug(f'Updating Transfer {transfer}')
+                transfer.update()
+            tstatus = [t.status for t in obj.transfers.all()]
+            if 'FAILED' in tstatus:
+                action.status = ActionStatusValue.FAILED
+                action.display_status = ActionStatusValue.FAILED.name
+            elif all((s == 'SUCCEEDED') for s in tstatus):
+                action.status = ActionStatusValue.SUCCEEDED.name
+                action.display_status = ActionStatusValue.SUCCEEDED.name
+            action.save()
+        return super().status(request, action_id)
 
 
 def logout(request, next='/'):
